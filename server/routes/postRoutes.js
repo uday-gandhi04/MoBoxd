@@ -1,39 +1,35 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { 
-  getFeedPosts, 
-  createPost, 
-  getPostById, 
+const {
+  getFeedPosts,
+  createPost,
+  getPostById,
   addReview,
   deletePost,
-  toggleLike
-} = require('../controllers/postController');
-const { protect } = require('../middleware/authMiddleware');
-const { upload } = require('../config/cloudinary');
+  toggleLike,
+  updatePost,
+} = require("../controllers/postController");
+const { protect } = require("../middleware/authMiddleware");
+const { upload } = require("../config/cloudinary");
 
 // Base routes (/api/posts)
-router.route('/')
+router.route("/")
   .get(getFeedPosts)
-  .post(protect, upload.single('image'), createPost);
+  .post(protect, upload.single("image"), createPost);
 
-
-// Delete post route (/api/posts/:id)
-router.route('/:id')
+// Single post routes (/api/posts/:id)
+// Grouped all single-ID operations into one block
+router.route("/:id")
   .get(getPostById)
+  .put(protect, updatePost)
   .delete(protect, deletePost);
 
 // Like route (/api/posts/:id/like)
-router.route('/:id/like')
-  .put(protect, toggleLike); // <-- Add this route
-
-// Single post routes (/api/posts/:id)
-router.route('/:id')
-  .get(getPostById);
+router.route("/:id/like")
+  .put(protect, toggleLike);
 
 // Review routes (/api/posts/:id/reviews)
-router.route('/:id/reviews')
+router.route("/:id/reviews")
   .post(protect, addReview);
-
-
 
 module.exports = router;

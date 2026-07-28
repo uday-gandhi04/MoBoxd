@@ -171,7 +171,35 @@ const toggleLike = async (req, res) => {
   }
 };
 
+const updatePost = async (req, res) => {
+  try {
+    const { caption, category, authorRating } = req.body;
+    const post = await Post.findById(req.params.id);
 
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    // Ensure the logged-in user is the author
+    if (post.author.toString() !== req.user.id) {
+      return res.status(401).json({ message: 'Not authorized to edit this post' });
+    }
+
+    // Update the fields
+    post.caption = caption || post.caption;
+    post.category = category || post.category;
+    if (authorRating) post.authorRating = Number(authorRating);
+
+    const updatedPost = await post.save();
+    
+    // Populate the author data so the frontend renders it correctly
+    await updatedPost.populate('author', 'username profilePicture');
+
+    res.status(200).json(updatedPost);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update post', error: error.message });
+  }
+};
 
 // Update your module.exports at the bottom:
 module.exports = {
@@ -181,4 +209,5 @@ module.exports = {
   addReview,
   deletePost,
   toggleLike,
+  updatePost,
 };

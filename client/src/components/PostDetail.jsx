@@ -18,6 +18,9 @@ const PostDetail = () => {
   const [comment, setComment] = useState('');
   const [reviewError, setReviewError] = useState('');
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({ caption: '', category: '', authorRating: 5 });
+
   useEffect(() => {
     const fetchPostData = async () => {
       try {
@@ -67,6 +70,31 @@ const PostDetail = () => {
     }
   };
 
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await axios.put(
+        `http://localhost:5000/api/posts/${id}`,
+        editData,
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      );
+      setPost(response.data); // Update the UI with the new data
+      setIsEditing(false); // Close edit mode
+    } catch (err) {
+      console.error('Failed to update post:', err);
+      alert(err.response?.data?.message || 'Failed to update post');
+    }
+  };
+
+  const startEditing = () => {
+    setEditData({
+      caption: post?.caption || '',
+      category: post?.category || 'Food',
+      authorRating: post?.authorRating || 5
+    });
+    setIsEditing(true);
+  };
+
   if (loading) return <div className="text-center mt-5"><div className="spinner-border text-warning"></div></div>;
   if (!post) return <div className="text-center mt-5 text-light">Post not found.</div>;
 
@@ -93,17 +121,73 @@ const PostDetail = () => {
             </div>
             
             <div className="d-flex align-items-center gap-2">
-              <span className="badge bg-secondary fs-6">{post.category}</span>
-              {/* Display Delete Button if logged-in user is the author */}
+              {/* Hide the category badge while editing to save space */}
+              {!isEditing && <span className="badge bg-secondary fs-6">{post.category}</span>}
+              
+              {/* Display Edit/Delete Buttons if logged-in user is the author */}
               {user && user._id === post.author._id && (
-                <button onClick={handleDeletePost} className="btn btn-outline-danger btn-sm fw-bold">
-                  <i className="bi bi-trash3-fill"></i> Delete
-                </button>
+                <>
+                  {isEditing ? (
+                    <button onClick={() => setIsEditing(false)} className="btn btn-outline-light btn-sm fw-bold">
+                      Cancel
+                    </button>
+                  ) : (
+                    <button onClick={startEditing} className="btn btn-outline-info btn-sm fw-bold">
+                      <i className="bi bi-pencil-square me-1"></i> Edit
+                    </button>
+                  )}
+                  <button onClick={handleDeletePost} className="btn btn-outline-danger btn-sm fw-bold">
+                    <i className="bi bi-trash3-fill me-1"></i> Delete
+                  </button>
+                </>
               )}
             </div>
           </div>
 
-          <p className="fs-5 mb-4">{post.caption}</p>
+          {/* Conditional Rendering: Edit Form OR Display Text */}
+          {isEditing ? (
+            <form onSubmit={handleEditSubmit} className="mb-4 bg-black bg-opacity-25 p-3 rounded-3 border border-secondary">
+              <div className="row mb-3">
+                <div className="col-6">
+                  <label className="form-label text-secondary small">Rating</label>
+                  <input 
+                    type="number" 
+                    className="form-control bg-dark text-light border-secondary focus-ring focus-ring-info" 
+                    min="0.5" max="5" step="0.5" 
+                    value={editData.authorRating}
+                    onChange={(e) => setEditData({...editData, authorRating: e.target.value})}
+                    required 
+                  />
+                </div>
+                <div className="col-6">
+                  <label className="form-label text-secondary small">Category</label>
+                  <select 
+                    className="form-select bg-dark text-light border-secondary focus-ring focus-ring-info"
+                    value={editData.category}
+                    onChange={(e) => setEditData({...editData, category: e.target.value})}
+                  >
+                    <option value="Food">🍔 Food</option>
+                    <option value="Place">📍 Place</option>
+                    <option value="Music">🎵 Music</option>
+                    <option value="Entertainment">🎬 Entertainment</option>
+                    <option value="Other">📦 Other</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="form-label text-secondary small">Caption</label>
+                <textarea 
+                  className="form-control bg-dark text-light border-secondary focus-ring focus-ring-info" 
+                  rows="3"
+                  value={editData.caption}
+                  onChange={(e) => setEditData({...editData, caption: e.target.value})}
+                ></textarea>
+              </div>
+              <button type="submit" className="btn btn-info fw-bold w-100 text-dark">Save Changes</button>
+            </form>
+          ) : (
+            <p className="fs-5 mb-4">{post.caption}</p>
+          )}
 
           <div className="row text-center border-top border-secondary pt-3">
             <div className="col-6 border-end border-secondary">
