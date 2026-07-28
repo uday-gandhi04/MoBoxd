@@ -5,7 +5,8 @@ const {
   createPost, 
   getPostById, 
   addReview,
-  deletePost
+  deletePost,
+  toggleLike
 } = require('../controllers/postController');
 const { protect } = require('../middleware/authMiddleware');
 const { upload } = require('../config/cloudinary');
@@ -20,6 +21,10 @@ router.route('/')
 router.route('/:id')
   .get(getPostById)
   .delete(protect, deletePost);
+
+// Like route (/api/posts/:id/like)
+router.route('/:id/like')
+  .put(protect, toggleLike); // <-- Add this route
 
 // Single post routes (/api/posts/:id)
 router.route('/:id')

@@ -143,11 +143,42 @@ const deletePost = async (req, res) => {
   }
 };
 
+const toggleLike = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    // Check if the post has already been liked by this user
+    const isLiked = post.likes.includes(req.user.id);
+
+    if (isLiked) {
+      // If liked, remove the user ID from the array
+      post.likes = post.likes.filter((userId) => userId.toString() !== req.user.id);
+    } else {
+      // If not liked, add the user ID to the array
+      post.likes.push(req.user.id);
+    }
+
+    await post.save();
+
+    // Return the updated likes array
+    res.status(200).json(post.likes);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to toggle like', error: error.message });
+  }
+};
+
+
+
 // Update your module.exports at the bottom:
 module.exports = {
   getFeedPosts,
   createPost,
   getPostById,
   addReview,
-  deletePost
+  deletePost,
+  toggleLike,
 };

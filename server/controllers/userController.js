@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
+const Post = require('../models/Post');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -78,7 +79,28 @@ const loginUser = async (req, res) => {
   }
 };
 
+const getUserProfile = async (req, res) => {
+  try {
+    // Find the user by username, exclude the password field
+    const user = await User.findOne({ username: req.params.username }).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Find all posts authored by this user, newest first
+    const posts = await Post.find({ author: user._id })
+      .sort({ createdAt: -1 })
+      .populate('author', 'username profilePicture'); // Populate to match feed structure
+
+    res.status(200).json({ user, posts });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
+  getUserProfile // <-- Export the new function
 };

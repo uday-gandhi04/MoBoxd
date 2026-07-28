@@ -6,6 +6,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import CreatePost from './components/CreatePost';
 import PostDetail from './components/PostDetail';
+import Profile from './components/Profile';
 
 function App() {
   const { user, logout } = useContext(AuthContext);
@@ -51,6 +52,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/create" element={<CreatePost />} />
         <Route path="/posts/:id" element={<PostDetail />} />
+        <Route path="/profile/:username" element={<Profile />} />
       </Routes>
     </div>
   );

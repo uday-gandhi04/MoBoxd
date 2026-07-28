@@ -8,6 +8,23 @@ const PostSchema = new mongoose.Schema({
   authorRating: { type: Number, min: 0.5, max: 5.0, required: true },
   communityAverageRating: { type: Number, default: 0 },
   totalReviews: { type: Number, default: 0 },
-}, { timestamps: true });
+communityAverageRating: {
+      type: Number,
+      default: 0,
+    },
+    totalReviews: {
+      type: Number,
+      default: 0,
+    },
+    // Add the likes array
+    likes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      }
+    ]
+  },
+  { timestamps: true }
+);
 
 module.exports = mongoose.model('Post', PostSchema);
