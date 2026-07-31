@@ -99,8 +99,28 @@ const getUserProfile = async (req, res) => {
   }
 };
 
+const searchUsers = async (req, res) => {
+  try {
+    const keyword = req.query.q;
+
+    if (!keyword) {
+      return res.status(200).json([]); // Return an empty array if no query is provided
+    }
+
+    // Perform a case-insensitive search
+    const users = await User.find({
+      username: { $regex: keyword, $options: 'i' }
+    }).select('-password'); // Exclude passwords from the response
+
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to search users', error: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
-  getUserProfile // <-- Export the new function
+  getUserProfile,
+  searchUsers,
 };
