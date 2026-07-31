@@ -7,33 +7,40 @@ const Feed = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { user } = useContext(AuthContext); // Get logged-in user
+  
+  const { user } = useContext(AuthContext);
 
   useEffect(() => {
-    const fetchPosts = async () => {
-      try {
-        const response = await axios.get('http://localhost:5000/api/posts');
-        setPosts(response.data);
+    const fetchPersonalFeed = async () => {
+      if (!user) {
         setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const response = await axios.get('http://localhost:5000/api/posts/feed', {
+          headers: { Authorization: `Bearer ${user.token}` }
+        });
+        setPosts(response.data);
       } catch (err) {
-        setError('Failed to load moments. Is the server running?');
+        setError('Failed to load your feed. Is the server running?');
+        console.error(err);
+      } finally {
         setLoading(false);
       }
     };
-    fetchPosts();
-  }, []);
+
+    fetchPersonalFeed();
+  }, [user]);
 
   const handleLike = async (postId) => {
     if (!user) return alert('Please log in to like moments.');
-
     try {
       const response = await axios.put(
         `http://localhost:5000/api/posts/${postId}/like`,
         {},
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
-
-      // Update the specific post's likes array in our local state
       setPosts(posts.map(post => 
         post._id === postId ? { ...post, likes: response.data } : post
       ));
@@ -42,60 +49,102 @@ const Feed = () => {
     }
   };
 
-  if (loading) return <div className="text-center mt-5"><div className="spinner-border text-warning"></div></div>;
-  if (error) return <div className="alert alert-danger m-4">{error}</div>;
+  // UI for logged-out users
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center px-4 pt-20">
+        <i className="bi bi-box-seam text-moboxd-accent text-6xl mb-4 block"></i>
+        <h2 className="text-3xl font-bold text-white mb-4">Welcome to MoBoxd</h2>
+        <p className="text-moboxd-muted text-lg">
+          <Link to="/login" className="text-moboxd-accent font-bold hover:underline">Log in</Link> to see moments from your friends, <br/>or head to the <Link to="/explore" className="text-moboxd-accent font-bold hover:underline">Explore</Link> page.
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="container mt-4" style={{ maxWidth: '600px' }}>
-      {posts.map((post) => {
-        // Check if the current user has liked this post
-        const isLiked = user && post.likes?.includes(user._id);
+    <div className="max-w-2xl mx-auto py-8 px-4">
+      
+      <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#2A2A35]">
+        <h1 className="text-2xl font-bold text-white tracking-wide">Your Feed</h1>
+      </div>
+
+      {loading && (
+        <div className="flex justify-center mt-10">
+          <div className="w-8 h-8 border-4 border-moboxd-accent border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      )}
+      
+      {error && <div className="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-xl mb-6">{error}</div>}
+
+      {/* Empty State */}
+      {!loading && !error && posts.length === 0 && (
+        <div className="text-center text-moboxd-muted mt-20">
+          <i className="bi bi-people text-5xl mb-4 block"></i>
+          <h5 className="text-xl font-bold text-white mb-2">You aren't following anyone yet.</h5>
+          <p>Head over to the <Link to="/explore" className="text-moboxd-accent hover:underline">Explore</Link> page to find friends!</p>
+        </div>
+      )}
+
+      {/* Posts Feed */}
+      {!loading && !error && posts.map((post) => {
+        const isLiked = post.likes?.includes(user._id);
 
         return (
-          <div key={post._id} className="card mb-4 shadow-sm bg-dark text-light border-secondary">
-            <div className="card-header border-secondary d-flex align-items-center">
-              <div className="bg-secondary rounded-circle me-2 d-flex justify-content-center align-items-center" style={{ width: '32px', height: '32px', overflow: 'hidden' }}>
-                 {post.author.profilePicture ? (
-                    <img src={post.author.profilePicture} alt="author" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div key={post._id} className="bg-moboxd-card rounded-2xl overflow-hidden mb-8 border border-[#2A2A35] shadow-lg">
+            
+            {/* Card Header */}
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <Link to={`/profile/${post.author.username}`} className="w-10 h-10 rounded-full bg-[#2A2A35] flex items-center justify-center overflow-hidden">
+                  {post.author.profilePicture ? (
+                    <img src={post.author.profilePicture} alt={post.author.username} className="w-full h-full object-cover" />
                   ) : (
-                    <i className="bi bi-person-fill text-light"></i>
+                    <i className="bi bi-person-fill text-moboxd-muted"></i>
                   )}
-              </div>
-              <Link to={`/profile/${post.author.username}`} className="text-light text-decoration-none fw-bold hover-warning">
-                {post.author.username}
-              </Link>
-            </div>
-
-            <Link to={`/posts/${post._id}`} className="text-decoration-none text-light">
-              <img src={post.imageUrl} className="card-img-top" alt={post.category} style={{ maxHeight: '400px', objectFit: 'cover' }} />
-              <div className="card-body">
-                <div className="d-flex justify-content-between align-items-center mb-2">
-                   <span className="text-warning fs-5 fw-bold">
-                     {post.authorRating} <i className="bi bi-star-fill"></i>
-                   </span>
-                   <span className="badge bg-secondary">{post.category}</span>
-                </div>
-                <p className="card-text mb-3">{post.caption}</p>
-              </div>
-            </Link>
-
-            <div className="card-footer border-secondary bg-dark text-light">
-              <div className="d-flex align-items-center gap-3 fs-5">
-                {/* Like Button */}
-                <div onClick={() => handleLike(post._id)} style={{ cursor: 'pointer' }} className="d-flex align-items-center gap-1 hover-warning">
-                  {isLiked ? (
-                    <i className="bi bi-heart-fill text-danger"></i>
-                  ) : (
-                    <i className="bi bi-heart"></i>
-                  )}
-                  <span className="fs-6">{post.likes?.length || 0}</span>
-                </div>
-
-                <Link to={`/posts/${post._id}`} className="text-light text-decoration-none d-flex align-items-center gap-1 hover-warning">
-                  <i className="bi bi-chat"></i>
-                  <span className="fs-6">{post.totalReviews}</span>
+                </Link>
+                <Link to={`/profile/${post.author.username}`} className="font-bold text-white hover:text-moboxd-accent transition-colors">
+                  {post.author.username}
                 </Link>
               </div>
+              <span className="text-xs font-bold px-3 py-1 bg-[#2A2A35] rounded-full text-moboxd-muted uppercase tracking-wider">
+                {post.category}
+              </span>
+            </div>
+
+            {/* Image */}
+            <Link to={`/posts/${post._id}`} className="block">
+              <img src={post.imageUrl} alt={post.category} className="w-full h-[400px] object-cover" />
+            </Link>
+
+            {/* Card Body */}
+            <div className="p-4">
+              <p className="text-white mb-4 text-lg">{post.caption}</p>
+              
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs text-moboxd-muted uppercase tracking-wider font-bold me-2">Author Rating</span>
+                <div className="flex text-moboxd-accent text-sm">
+                  {[...Array(5)].map((_, i) => (
+                    <i key={i} className={`bi bi-star${i < post.authorRating ? '-fill' : ''}`}></i>
+                  ))}
+                </div>
+                <span className="font-bold text-white ms-1">{post.authorRating}.0</span>
+              </div>
+            </div>
+
+            {/* Card Footer */}
+            <div className="px-4 py-3 border-t border-[#2A2A35] flex items-center gap-6">
+              <button onClick={() => handleLike(post._id)} className="flex items-center gap-2 group transition-colors focus:outline-none">
+                <i className={`bi bi-heart${isLiked ? '-fill text-red-500' : ' text-moboxd-muted group-hover:text-red-500'}`}></i>
+                <span className={isLiked ? 'text-white font-medium' : 'text-moboxd-muted group-hover:text-white font-medium'}>
+                  {post.likes?.length || 0}
+                </span>
+              </button>
+
+              <Link to={`/posts/${post._id}`} className="flex items-center gap-2 group transition-colors">
+                <i className="bi bi-chat text-moboxd-muted group-hover:text-white"></i>
+                <span className="text-moboxd-muted group-hover:text-white font-medium">{post.totalReviews}</span>
+              </Link>
             </div>
           </div>
         );

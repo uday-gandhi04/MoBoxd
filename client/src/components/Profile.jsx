@@ -1,20 +1,38 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import { AuthContext } from '../context/AuthContext';
 
 const Profile = () => {
   const { username } = useParams();
+  const { user } = useContext(AuthContext);
+  
   const [profileUser, setProfileUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
     const fetchProfile = async () => {
+      setLoading(true);
       try {
         const response = await axios.get(`http://localhost:5000/api/users/${username}`);
-        setProfileUser(response.data.user);
+        const fetchedUser = response.data.user;
+        
+        setProfileUser(fetchedUser);
         setUserPosts(response.data.posts);
+        setFollowerCount(fetchedUser.followers?.length || 0);
+        setFollowingCount(fetchedUser.following?.length || 0);
+
+        if (user && fetchedUser.followers?.includes(user._id)) {
+          setIsFollowing(true);
+        } else {
+          setIsFollowing(false);
+        }
         setLoading(false);
       } catch (err) {
         setError(err.response?.data?.message || 'Failed to load profile');
@@ -23,52 +41,154 @@ const Profile = () => {
     };
 
     fetchProfile();
-  }, [username]);
+  }, [username, user]);
 
-  if (loading) return <div className="text-center mt-5"><div className="spinner-border text-warning"></div></div>;
-  if (error) return <div className="text-center mt-5 text-danger">{error}</div>;
-  if (!profileUser) return <div className="text-center mt-5 text-light">User not found</div>;
+  const handleFollowToggle = async () => {
+    if (!user) return alert('You must be logged in to follow users.');
+    try {
+      await axios.put(
+        `http://localhost:5000/api/users/${profileUser._id}/follow`,
+        {},
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      );
+
+      if (isFollowing) {
+        setFollowerCount(prev => prev - 1);
+        setIsFollowing(false);
+      } else {
+        setFollowerCount(prev => prev + 1);
+        setIsFollowing(true);
+      }
+    } catch (error) {
+      console.error('Failed to toggle follow:', error);
+      alert('Something went wrong. Please try again.');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center mt-20">
+        <div className="w-8 h-8 border-4 border-moboxd-accent border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (error || !profileUser) {
+    return <div className="text-center text-red-400 mt-20 text-xl font-bold">{error || 'User not found'}</div>;
+  }
+
+  // Calculate community average for the user
+  const avgRating = userPosts.length > 0 
+    ? (userPosts.reduce((acc, post) => acc + post.authorRating, 0) / userPosts.length).toFixed(1)
+    : '0.0';
 
   return (
-    <div className="container mt-4 mb-5" style={{ maxWidth: '900px' }}>
+    <div className="max-w-4xl mx-auto py-10 px-4">
+      
       {/* Profile Header */}
-      <div className="d-flex align-items-center mb-5 pb-4 border-bottom border-secondary">
-        <div className="bg-secondary rounded-circle me-4 d-flex justify-content-center align-items-center" style={{ width: '100px', height: '100px', overflow: 'hidden' }}>
+      <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-12 pb-8 border-b border-[#2A2A35]">
+        
+        {/* Avatar */}
+        <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-[#1A1A21] flex items-center justify-center overflow-hidden border-2 border-[#2A2A35] shadow-lg shrink-0">
           {profileUser.profilePicture ? (
-            <img src={profileUser.profilePicture} alt={profileUser.username} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={profileUser.profilePicture} alt={profileUser.username} className="w-full h-full object-cover" />
           ) : (
-            <i className="bi bi-person-fill text-light" style={{ fontSize: '4rem' }}></i>
+            <i className="bi bi-person-fill text-moboxd-muted text-6xl"></i>
           )}
         </div>
-        <div>
-          <h2 className="fw-bold text-light mb-1">{profileUser.username}</h2>
-          <p className="text-secondary mb-0">{userPosts.length} Moments Boxed</p>
+
+        {/* User Info & Stats */}
+        <div className="flex-1 text-center md:text-left w-full">
+          <div className="flex flex-col md:flex-row items-center md:justify-between gap-4 mb-6">
+            <div>
+              <h2 className="text-3xl font-bold text-white tracking-wide">{profileUser.username}</h2>
+              <span className="text-moboxd-muted text-sm">@{profileUser.username.toLowerCase()}</span>
+            </div>
+
+            {/* Follow / Edit Button */}
+            {user && user.username !== profileUser.username ? (
+              <button 
+                onClick={handleFollowToggle} 
+                className={`px-6 py-2 rounded-xl font-bold transition-colors w-full md:w-auto ${isFollowing ? 'bg-[#2A2A35] text-white hover:bg-[#3A3A45]' : 'bg-moboxd-accent text-black hover:bg-yellow-400'}`}
+              >
+                {isFollowing ? 'Unfollow' : 'Follow'}
+              </button>
+            ) : user && user.username === profileUser.username ? (
+              <button className="px-6 py-2 rounded-xl font-bold bg-[#2A2A35] text-white hover:bg-[#3A3A45] transition-colors w-full md:w-auto">
+                Edit Profile
+              </button>
+            ) : null}
+          </div>
+
+          {/* Stats Bar */}
+          <div className="flex items-center justify-center md:justify-start gap-8 md:gap-12 text-center">
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold text-white">{userPosts.length}</span>
+              <span className="text-xs text-moboxd-muted uppercase tracking-widest">Moments</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold text-white">{followerCount}</span>
+              <span className="text-xs text-moboxd-muted uppercase tracking-widest">Followers</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold text-white">{followingCount}</span>
+              <span className="text-xs text-moboxd-muted uppercase tracking-widest">Following</span>
+            </div>
+          </div>
+
+          {/* Average Rating Block */}
+          <div className="mt-6 inline-flex items-center gap-3 bg-[#1A1A21] px-4 py-2 rounded-xl border border-[#2A2A35]">
+            <span className="text-sm font-bold text-moboxd-muted uppercase tracking-wider">Avg Rating</span>
+            <div className="flex text-moboxd-accent text-sm">
+              {[...Array(5)].map((_, i) => (
+                <i key={i} className={`bi bi-star${i < Math.round(avgRating) ? '-fill' : ''}`}></i>
+              ))}
+            </div>
+            <span className="font-bold text-white">{avgRating}</span>
+          </div>
         </div>
       </div>
 
-      {/* User's Posts Grid */}
-      <div className="row g-4">
-        {userPosts.length === 0 ? (
-          <p className="text-secondary text-center">No posts yet.</p>
-        ) : (
-          userPosts.map((post) => (
-            <div key={post._id} className="col-12 col-md-6 col-lg-4">
-              <Link to={`/posts/${post._id}`} className="text-decoration-none">
-                <div className="card bg-dark border-secondary h-100 text-light shadow-sm post-card-hover" style={{ borderRadius: '0.75rem', overflow: 'hidden' }}>
-                  <img src={post.imageUrl} alt={post.category} className="card-img-top" style={{ height: '250px', objectFit: 'cover' }} />
-                  <div className="card-body p-3">
-                    <div className="d-flex justify-content-between align-items-center mb-2">
-                      <span className="text-warning fw-bold">{post.authorRating} <i className="bi bi-star-fill"></i></span>
-                      <span className="badge bg-secondary">{post.category}</span>
-                    </div>
-                    <p className="card-text small text-truncate">{post.caption}</p>
-                  </div>
-                </div>
-              </Link>
-            </div>
-          ))
-        )}
+      {/* Grid Tabs */}
+      <div className="flex justify-center md:justify-start gap-8 mb-6 border-b border-[#2A2A35]">
+        <button className="pb-3 border-b-2 border-moboxd-accent text-white font-bold tracking-wide flex items-center gap-2">
+          <i className="bi bi-grid-3x3"></i> Moments
+        </button>
+        <button className="pb-3 border-b-2 border-transparent text-moboxd-muted hover:text-white font-bold tracking-wide flex items-center gap-2 transition-colors">
+          <i className="bi bi-bookmark"></i> Saved
+        </button>
       </div>
+
+      {/* Empty State */}
+      {userPosts.length === 0 && (
+        <div className="text-center text-moboxd-muted mt-20">
+          <i className="bi bi-camera text-5xl mb-4 block"></i>
+          <h5 className="text-xl font-bold text-white mb-2">No moments yet.</h5>
+        </div>
+      )}
+
+      {/* Image Grid */}
+      <div className="grid grid-cols-3 gap-1 md:gap-4">
+        {userPosts.map((post) => (
+          <Link key={post._id} to={`/posts/${post._id}`} className="block relative group overflow-hidden bg-[#1A1A21] rounded-sm md:rounded-xl">
+            {/* Square Aspect Ratio Crop */}
+            <div className="aspect-square">
+              <img src={post.imageUrl} alt={post.category} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+            </div>
+            
+            {/* Hover Overlay */}
+            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
+              <div className="flex items-center gap-2 text-white font-bold">
+                <i className="bi bi-heart-fill text-red-500"></i> {post.likes?.length || 0}
+              </div>
+              <div className="flex items-center gap-2 text-white font-bold">
+                <i className="bi bi-chat-fill"></i> {post.totalReviews || 0}
+              </div>
+            </div>
+          </Link>
+        ))}
+      </div>
+      
     </div>
   );
 };

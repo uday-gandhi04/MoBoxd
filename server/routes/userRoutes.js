@@ -1,12 +1,22 @@
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser, getUserProfile, searchUsers } = require('../controllers/userController'); // <-- Import searchUsers
+const { 
+  registerUser, 
+  loginUser, 
+  getUserProfile, 
+  searchUsers,
+  toggleFollow // <-- Import the new controller
+} = require('../controllers/userController');
+const { protect } = require('../middleware/authMiddleware'); // <-- Import auth middleware
 
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 
-// MUST go before /:username to prevent route conflicts
+// Search must be above /:username
 router.get('/search', searchUsers); 
+
+// Protected follow route
+router.put('/:id/follow', protect, toggleFollow); // <-- Add this route
 
 router.get('/:username', getUserProfile);
 

@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  /* Define our custom MoBoxd color palette */
+  --color-moboxd-bg: #0F0F13;
+  --color-moboxd-card: #1A1A21;
+  --color-moboxd-accent: #FFC800;
+  --color-moboxd-text: #FFFFFF;
+  --color-moboxd-muted: #8A8A93;
+}
+
+/* Apply the global styles */
+body {
+  @apply bg-moboxd-bg text-moboxd-text font-sans antialiased;
+}
+
+/* --- NEW: Hide scrollbar completely but keep scroll functionality --- */
+.custom-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+.custom-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}

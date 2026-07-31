@@ -1,29 +1,44 @@
+import { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import Navbar from './components/Navbar';
+import Sidebar from './components/Sidebar';
 import Feed from './components/Feed';
 import Login from './components/Login';
 import Register from './components/Register';
-import CreatePost from './components/CreatePost';
 import PostDetail from './components/PostDetail';
 import Profile from './components/Profile';
 import Explore from './components/Explore';
+import CreatePostModal from './components/CreatePostModal'; // Import the new modal
 
 function App() {
-  return (
-    <div className="bg-dark min-vh-100" style={{ backgroundColor: '#121212' }}>
-      {/* The Navbar component handles its own state and logic */}
-      <Navbar />
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-      {/* The Router handles page navigation */}
-      <Routes>
-        <Route path="/" element={<Feed />} />
-        <Route path="/explore" element={<Explore />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/create" element={<CreatePost />} />
-        <Route path="/posts/:id" element={<PostDetail />} />
-        <Route path="/profile/:username" element={<Profile />} />
-      </Routes>
+  return (
+    <div className="flex h-screen bg-moboxd-bg text-moboxd-text overflow-hidden font-sans">
+      
+      {/* Pass the open function to the Sidebar */}
+      <Sidebar onOpenCreateModal={() => setIsCreateModalOpen(true)} />
+
+      <main className="flex-1 overflow-y-auto">
+        <Routes>
+          <Route path="/" element={<Feed />} />
+          <Route path="/explore" element={<Explore />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/posts/:id" element={<PostDetail />} />
+          <Route path="/profile/:username" element={<Profile />} />
+        </Routes>
+      </main>
+
+      {/* Render the Modal at the root level */}
+      <CreatePostModal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)} 
+        onPostCreated={() => {
+          // A quick page reload ensures the feed grabs the newest post immediately
+          window.location.reload(); 
+        }}
+      />
+
     </div>
   );
 }

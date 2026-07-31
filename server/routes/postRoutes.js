@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   getFeedPosts,
+  getPersonalFeed,
   createPost,
   getPostById,
   addReview,
@@ -16,6 +17,9 @@ const { upload } = require("../config/cloudinary");
 router.route("/")
   .get(getFeedPosts)
   .post(protect, upload.single("image"), createPost);
+
+router.route("/feed")
+  .get(protect, getPersonalFeed);
 
 // Single post routes (/api/posts/:id)
 // Grouped all single-ID operations into one block
