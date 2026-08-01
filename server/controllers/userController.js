@@ -2,6 +2,11 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Post = require('../models/Post');
+const Activity = require('../models/Activity'); // IMPORT THE ACTIVITY MODEL
+const { OAuth2Client } = require('google-auth-library');
+const axios = require('axios');
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Generate JWT
 const generateToken = (id) => {
@@ -15,7 +20,7 @@ const generateToken = (id) => {
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { displayName, username, email, password } = req.body;
 
     if (!username || !email || !password) {
       return res.status(400).json({ message: 'Please add all fields' });
@@ -33,6 +38,7 @@ const registerUser = async (req, res) => {
 
     // Create user
     const user = await User.create({
+      displayName,
       username,
       email,
       password: hashedPassword,
@@ -41,6 +47,7 @@ const registerUser = async (req, res) => {
     if (user) {
       res.status(201).json({
         _id: user.id,
+        displayName: user.displayName,
         username: user.username,
         email: user.email,
         token: generateToken(user._id),
@@ -142,10 +149,25 @@ const toggleFollow = async (req, res) => {
       // Unfollow logic: Remove IDs from respective arrays
       currentUser.following = currentUser.following.filter(id => id.toString() !== targetUserId);
       targetUser.followers = targetUser.followers.filter(id => id.toString() !== currentUserId);
+
+      // ACTIVITY TRIGGER: Remove the follow activity from the feed
+      await Activity.findOneAndDelete({
+        actor: currentUserId,
+        actionType: 'FOLLOW',
+        targetUser: targetUserId
+      });
+
     } else {
       // Follow logic: Add IDs to respective arrays
       currentUser.following.push(targetUserId);
       targetUser.followers.push(currentUserId);
+
+      // ACTIVITY TRIGGER: Log the follow activity
+      await Activity.create({
+        actor: currentUserId,
+        actionType: 'FOLLOW',
+        targetUser: targetUserId
+      });
     }
 
     await currentUser.save();
@@ -161,10 +183,121 @@ const toggleFollow = async (req, res) => {
   }
 };
 
+// @desc    Update user profile
+// @route   PUT /api/users/:id
+// @access  Private
+const updateProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Ensure the logged-in user is only updating their own profile
+    if (user._id.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'Not authorized to update this profile' });
+    }
+
+    // Update basic text fields
+    if (req.body.displayName) user.displayName = req.body.displayName;
+    if (req.body.bio !== undefined) user.bio = req.body.bio;
+
+    // Update password if one was provided
+    // (Assuming your User model has a pre('save') hook to hash passwords using bcrypt)
+    if (req.body.password) {
+      user.password = req.body.password;
+    }
+
+    // If Multer processed a new image, update the profile picture URL
+    if (req.file) {
+      user.profilePicture = req.file.path; // Assumes Cloudinary/Multer puts the URL here
+    }
+
+    const updatedUser = await user.save();
+
+    // Send back the updated user data (excluding the password)
+    res.json({
+      _id: updatedUser._id,
+      username: updatedUser.username,
+      displayName: updatedUser.displayName,
+      email: updatedUser.email,
+      profilePicture: updatedUser.profilePicture,
+      bio: updatedUser.bio,
+      token: req.headers.authorization.split(' ')[1] // Preserve the existing token
+    });
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    
+    // Handle specific MongoDB errors like duplicate usernames
+    if (error.code === 11000) {
+       return res.status(400).json({ message: 'Username is already taken' });
+    }
+    
+    res.status(500).json({ message: 'Server error updating profile' });
+  }
+};
+
+// @desc    Auth with Google
+// @route   POST /api/users/google
+// @access  Public
+const googleAuth = async (req, res) => {
+  const { token } = req.body; // This is now the access_token from the frontend
+
+  if (!token) {
+    return res.status(400).json({ message: 'No authentication token provided' });
+  }
+
+  try {
+    // 1. Fetch user data directly from Google using the access_token
+    const googleResponse = await axios.get(
+      'https://www.googleapis.com/oauth2/v3/userinfo',
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    
+    // 2. Extract user data from Google's response
+    const { email, name, picture, sub } = googleResponse.data;
+
+    // 3. Check if user already exists in our database
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      // Create a unique username based on their email prefix + random numbers
+      const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+      
+      // 4. Create the new user
+      user = await User.create({
+        displayName: name,
+        username: `${baseUsername}${randomSuffix}`,
+        email,
+        password: sub, // Use their unique Google ID as a dummy secure password
+        profilePicture: picture,
+      });
+    }
+
+    // 5. Send back our custom MoBoxd JWT and user data
+    res.status(200).json({
+      _id: user._id,
+      displayName: user.displayName,
+      username: user.username,
+      email: user.email,
+      profilePicture: user.profilePicture,
+      token: generateToken(user._id),
+    });
+
+  } catch (error) {
+    console.error('Google Auth Error:', error.response?.data || error.message);
+    res.status(401).json({ message: 'Google authentication failed' });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getUserProfile,
   searchUsers,
-  toggleFollow
+  toggleFollow,
+  updateProfile,
+  googleAuth,
 };

@@ -8,6 +8,10 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    displayName: {
+      type: String,
+      // Default will be handled in the controller or frontend
+    },
     email: {
       type: String,
       required: true,
