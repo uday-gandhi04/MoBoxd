@@ -7,7 +7,9 @@ const {
   searchUsers,
   toggleFollow,
   updateProfile,
-  googleAuth
+  googleAuth,
+  toggleBookmark,
+  getBookmarkedPosts
 } = require('../controllers/userController');
 
 const { protect } = require('../middleware/authMiddleware'); // <-- Import auth middleware
@@ -16,6 +18,8 @@ const upload = require('../middleware/upload'); // Your Multer configuration
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/google', googleAuth);
+router.get('/bookmarks', protect, getBookmarkedPosts);
+router.put('/bookmarks/:postId', protect, toggleBookmark);
 
 router.put('/:id', protect, upload.single('profilePicture'), updateProfile);
 

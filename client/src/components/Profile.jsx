@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import EditProfileModal from "./EditProfileModal";
@@ -7,11 +7,23 @@ import EditProfileModal from "./EditProfileModal";
 const Profile = () => {
   const { username } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Read the URL to see if we should start on a specific tab
+  const queryParams = new URLSearchParams(location.search);
+  const tabParam = queryParams.get("tab");
+  const initialTab = tabParam === "saved" ? "SAVED" : tabParam === "rankings" ? "RANKINGS" : "MOMENTS";
+
   const { user, setUser } = useContext(AuthContext);
 
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [profileUser, setProfileUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
+  const [userRankings, setUserRankings] = useState([]); // NEW STATE FOR RANKINGS
+  const [savedPosts, setSavedPosts] = useState([]);
+  
   const [loading, setLoading] = useState(true);
+  const [loadingSaved, setLoadingSaved] = useState(false);
   const [error, setError] = useState("");
 
   const [isFollowing, setIsFollowing] = useState(false);
@@ -20,6 +32,16 @@ const Profile = () => {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // Watch URL changes for sidebar clicks
+  useEffect(() => {
+    const currentParams = new URLSearchParams(location.search);
+    const currentTab = currentParams.get("tab");
+    if (currentTab === "saved") setActiveTab("SAVED");
+    else if (currentTab === "rankings") setActiveTab("RANKINGS");
+    else setActiveTab("MOMENTS");
+  }, [location.search]);
+
+  // Fetch the main profile data (User, Posts, and Rankings)
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
@@ -31,6 +53,8 @@ const Profile = () => {
 
         setProfileUser(fetchedUser);
         setUserPosts(response.data.posts);
+        setUserRankings(response.data.rankings || []); // SET RANKINGS HERE
+        
         setFollowerCount(fetchedUser.followers?.length || 0);
         setFollowingCount(fetchedUser.following?.length || 0);
 
@@ -48,6 +72,26 @@ const Profile = () => {
 
     fetchProfile();
   }, [username, user]);
+
+  // Fetch Saved Bookmarks independently 
+  useEffect(() => {
+    const fetchBookmarks = async () => {
+      if (activeTab === 'SAVED' && user && user.username === profileUser?.username) {
+        setLoadingSaved(true);
+        try {
+          const response = await axios.get('http://localhost:5000/api/users/bookmarks', {
+            headers: { Authorization: `Bearer ${user.token}` }
+          });
+          setSavedPosts(response.data);
+        } catch (err) {
+          console.error("Failed to load saved posts");
+        } finally {
+          setLoadingSaved(false);
+        }
+      }
+    };
+    fetchBookmarks();
+  }, [activeTab, user, profileUser]);
 
   const handleFollowToggle = async () => {
     if (!user) return alert("You must be logged in to follow users.");
@@ -87,14 +131,7 @@ const Profile = () => {
     );
   }
 
-  // Calculate community average for the user
-  const avgRating =
-    userPosts.length > 0
-      ? (
-          userPosts.reduce((acc, post) => acc + post.authorRating, 0) /
-          userPosts.length
-        ).toFixed(1)
-      : "0.0";
+  const displayPosts = activeTab === 'MOMENTS' ? userPosts : savedPosts;
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-4">
@@ -117,15 +154,12 @@ const Profile = () => {
         <div className="flex-1 text-center md:text-left w-full">
           <div className="flex flex-col md:flex-row items-center md:justify-between gap-4 mb-6">
             <div>
-              {/* Display Name as the main header, falling back to username */}
               <h2 className="text-3xl font-extrabold text-white tracking-wide">
                 {profileUser.displayName || profileUser.username}
               </h2>
-              {/* Permanent username handle below */}
               <p className="text-moboxd-accent font-medium mt-1">
                 @{profileUser.username.toLowerCase()}
               </p>
-              {/* Render Bio if it exists */}
               {profileUser.bio && (
                 <p className="text-gray-300 mt-3 text-sm max-w-md mx-auto md:mx-0 leading-relaxed">
                   {profileUser.bio}
@@ -163,6 +197,14 @@ const Profile = () => {
             </div>
             <div className="flex flex-col">
               <span className="text-2xl font-bold text-white">
+                {userRankings.length}
+              </span>
+              <span className="text-xs text-moboxd-muted uppercase tracking-widest">
+                Rankings
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold text-white">
                 {followerCount}
               </span>
               <span className="text-xs text-moboxd-muted uppercase tracking-widest">
@@ -178,95 +220,134 @@ const Profile = () => {
               </span>
             </div>
           </div>
-
-          {/* Average Rating Block */}
-          <div className="mt-6 inline-flex items-center gap-3 bg-[#1A1A21] px-4 py-2 rounded-xl border border-[#2A2A35]">
-            <span className="text-sm font-bold text-moboxd-muted uppercase tracking-wider">
-              Avg Rating
-            </span>
-            <div className="flex text-moboxd-accent text-sm">
-              {[...Array(5)].map((_, i) => (
-                <i
-                  key={i}
-                  className={`bi bi-star${i < Math.round(avgRating) ? "-fill" : ""}`}
-                ></i>
-              ))}
-            </div>
-            <span className="font-bold text-white">{avgRating}</span>
-          </div>
         </div>
       </div>
 
       {/* Grid Tabs */}
       <div className="flex justify-center md:justify-start gap-8 mb-6 border-b border-[#2A2A35]">
-        <button className="pb-3 border-b-2 border-moboxd-accent text-white font-bold tracking-wide flex items-center gap-2">
+        <button 
+          onClick={() => {
+            setActiveTab('MOMENTS');
+            navigate(`/profile/${username}`);
+          }}
+          className={`pb-3 border-b-2 font-bold tracking-wide flex items-center gap-2 transition-colors ${activeTab === 'MOMENTS' ? 'border-moboxd-accent text-white' : 'border-transparent text-moboxd-muted hover:text-white'}`}
+        >
           <i className="bi bi-grid-3x3"></i> Moments
         </button>
-        <button className="pb-3 border-b-2 border-transparent text-moboxd-muted hover:text-white font-bold tracking-wide flex items-center gap-2 transition-colors">
-          <i className="bi bi-bookmark"></i> Saved
+
+        <button 
+          onClick={() => {
+            setActiveTab('RANKINGS');
+            navigate(`/profile/${username}?tab=rankings`);
+          }}
+          className={`pb-3 border-b-2 font-bold tracking-wide flex items-center gap-2 transition-colors ${activeTab === 'RANKINGS' ? 'border-moboxd-accent text-white' : 'border-transparent text-moboxd-muted hover:text-white'}`}
+        >
+          <i className="bi bi-trophy"></i> Rankings
         </button>
+
+        {user && profileUser && user.username === profileUser.username && (
+          <button 
+            onClick={() => {
+              setActiveTab('SAVED');
+              navigate(`/profile/${username}?tab=saved`);
+            }}
+            className={`pb-3 border-b-2 font-bold tracking-wide flex items-center gap-2 transition-colors ${activeTab === 'SAVED' ? 'border-moboxd-accent text-white' : 'border-transparent text-moboxd-muted hover:text-white'}`}
+          >
+            <i className="bi bi-bookmark"></i> Saved
+          </button>
+        )}
       </div>
 
-      {/* Empty State */}
-      {userPosts.length === 0 && (
+      {/* Empty States */}
+      {activeTab === 'MOMENTS' && userPosts.length === 0 && (
         <div className="text-center text-moboxd-muted mt-20">
           <i className="bi bi-camera text-5xl mb-4 block"></i>
           <h5 className="text-xl font-bold text-white mb-2">No moments yet.</h5>
         </div>
       )}
 
-      {/* Image Grid */}
-      <div className="grid grid-cols-3 gap-1 md:gap-4">
-        {userPosts.map((post) => (
-          <Link
-            key={post._id}
-            to={`/posts/${post._id}`}
-            className="block relative group overflow-hidden bg-[#1A1A21] rounded-sm md:rounded-xl"
-          >
-            {/* Square Aspect Ratio Crop */}
-            <div className="aspect-square">
-              <img
-                src={post.imageUrl}
-                alt={post.category}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              />
-            </div>
+      {activeTab === 'RANKINGS' && userRankings.length === 0 && (
+        <div className="text-center text-moboxd-muted mt-20">
+          <i className="bi bi-trophy text-5xl mb-4 block"></i>
+          <h5 className="text-xl font-bold text-white mb-2">No rankings yet.</h5>
+        </div>
+      )}
 
-            {/* Hover Overlay */}
-            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
-              <div className="flex items-center gap-2 text-white font-bold">
-                <i className="bi bi-heart-fill text-red-500"></i>{" "}
-                {post.likes?.length || 0}
-              </div>
-              <div className="flex items-center gap-2 text-white font-bold">
-                <i className="bi bi-chat-fill"></i> {post.totalReviews || 0}
-              </div>
-            </div>
-          </Link>
-        ))}
-      </div>
+      {activeTab === 'SAVED' && savedPosts.length === 0 && !loadingSaved && (
+        <div className="text-center text-moboxd-muted mt-20">
+          <i className="bi bi-bookmark-dash text-5xl mb-4 block"></i>
+          <h5 className="text-xl font-bold text-white mb-2">Nothing saved yet.</h5>
+          <p>Tap the bookmark icon on any post to save it for later.</p>
+        </div>
+      )}
+
+      {loadingSaved && activeTab === 'SAVED' && (
+        <div className="flex justify-center mt-20">
+          <div className="w-8 h-8 border-4 border-moboxd-accent border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      )}
+
+      {/* Feed Rendering */}
+      {activeTab === 'RANKINGS' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {userRankings.map((ranking) => (
+            <Link 
+              to={`/rankings/${ranking._id}`} 
+              key={ranking._id} 
+              className="block bg-[#1A1A21] border border-[#2A2A35] rounded-3xl p-6 hover:border-moboxd-accent transition-all"
+            >
+              <h3 className="text-xl font-bold text-white mb-2">{ranking.title}</h3>
+              <p className="text-moboxd-muted text-sm line-clamp-2">
+                {ranking.items && ranking.items.length > 0 
+                  ? ranking.items.map(i => i.name).join(', ') 
+                  : 'No items listed'}
+              </p>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        (!loadingSaved || activeTab === 'MOMENTS') && (
+          <div className="grid grid-cols-3 gap-1 md:gap-4">
+            {displayPosts.map((post) => (
+              <Link
+                key={post._id}
+                to={`/posts/${post._id}`}
+                className="block relative group overflow-hidden bg-[#1A1A21] rounded-sm md:rounded-xl"
+              >
+                <div className="aspect-square">
+                  <img
+                    src={post.imageUrl}
+                    alt={post.category}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                </div>
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
+                  <div className="flex items-center gap-2 text-white font-bold">
+                    <i className="bi bi-heart-fill text-red-500"></i>{" "}
+                    {post.likes?.length || 0}
+                  </div>
+                  <div className="flex items-center gap-2 text-white font-bold">
+                    <i className="bi bi-chat-fill"></i> {post.totalReviews || 0}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )
+      )}
 
       {/* Edit Profile Modal */}
-      <EditProfileModal
+      <EditProfileModal 
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         profileData={profileUser}
         onUpdateSuccess={(updatedData) => {
-          // 1. Update the local profile page UI
-          setProfileUser((prev) => ({ ...prev, ...updatedData }));
-
-          // 2. Update the global AuthContext so the Sidebar updates instantly!
+          setProfileUser(prev => ({ ...prev, ...updatedData }));
           if (setUser) {
-            setUser((prev) => ({ ...prev, ...updatedData }));
-
-            // Optional safety measure: If your AuthContext relies on localStorage to persist sessions,
-            // you might want to update it here so a page refresh doesn't revert the Sidebar.
-            const storedUser = JSON.parse(localStorage.getItem("user"));
+            setUser(prev => ({ ...prev, ...updatedData }));
+            const storedUser = JSON.parse(localStorage.getItem('user'));
             if (storedUser) {
-              localStorage.setItem(
-                "user",
-                JSON.stringify({ ...storedUser, ...updatedData }),
-              );
+              localStorage.setItem('user', JSON.stringify({ ...storedUser, ...updatedData }));
             }
           }
         }}

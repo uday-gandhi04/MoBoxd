@@ -76,17 +76,29 @@ const Sidebar = ({ onOpenCreateModal }) => {
             <i className="bi bi-bell text-xl"></i>
             <span className="font-bold tracking-wide">Activity</span>
           </Link>
-          <Link
-            to="#"
-            className="flex items-center gap-4 px-4 py-3 rounded-xl font-medium text-moboxd-muted hover:text-white hover:bg-[#1A1A21] transition-colors cursor-not-allowed opacity-50"
-          >
-            <i className="bi bi-bookmark text-lg"></i>
-            Bookmarks
-          </Link>
+          {user && (
+            <Link
+              to={`/profile/${user.username}?tab=saved`}
+              className={`flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-colors ${
+                location.pathname === `/profile/${user.username}` &&
+                location.search === "?tab=saved"
+                  ? "bg-moboxd-card text-moboxd-accent"
+                  : "text-moboxd-muted hover:text-white hover:bg-[#2A2A35]"
+              }`}
+            >
+              <i className="bi bi-bookmark text-lg"></i>
+              Bookmarks
+            </Link>
+          )}
           {user && (
             <Link
               to={`/profile/${user.username}`}
-              className={`flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-colors ${isActive(`/profile/${user.username}`) ? "bg-moboxd-card text-moboxd-accent" : "text-moboxd-muted hover:text-white hover:bg-[#1A1A21]"}`}
+              className={`flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-colors ${
+                location.pathname === `/profile/${user.username}` &&
+                location.search !== "?tab=saved"
+                  ? "bg-moboxd-card text-moboxd-accent"
+                  : "text-moboxd-muted hover:text-white hover:bg-[#1A1A21]"
+              }`}
             >
               <i className="bi bi-person text-lg"></i>
               Profile

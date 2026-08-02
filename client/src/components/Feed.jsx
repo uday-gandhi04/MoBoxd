@@ -54,6 +54,41 @@ const Feed = () => {
     }
   };
 
+  const handleBookmark = async (postId) => {
+    if (!user) return alert("Please log in to save moments.");
+    try {
+      const response = await axios.put(
+        `http://localhost:5000/api/users/bookmarks/${postId}`,
+        {},
+        { headers: { Authorization: `Bearer ${user.token}` } },
+      );
+      // Update the global user context immediately so the UI reacts
+      setUser((prev) => ({ ...prev, bookmarks: response.data }));
+    } catch (error) {
+      console.error("Error toggling bookmark:", error);
+    }
+  };
+
+  const handleShare = async (postId, authorName) => {
+    // Construct the absolute URL to the specific post
+    const url = `${window.location.origin}/posts/${postId}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Check out this moment by @${authorName} on MoBoxd`,
+          url: url,
+        });
+      } catch (err) {
+        console.log("Share cancelled", err);
+      }
+    } else {
+      // Fallback for desktop browsers that don't support native sharing
+      navigator.clipboard.writeText(url);
+      alert("Post link copied to clipboard!");
+    }
+  };
+
   // UI for logged-out users
   if (!user) {
     return (
@@ -197,34 +232,60 @@ const Feed = () => {
               </div>
 
               {/* Card Footer */}
-              <div className="px-4 py-3 border-t border-[#2A2A35] flex items-center gap-6">
-                <button
-                  onClick={() => handleLike(post._id)}
-                  className="flex items-center gap-2 group transition-colors focus:outline-none"
-                >
-                  <i
-                    className={`bi bi-heart${isLiked ? "-fill text-red-500" : " text-moboxd-muted group-hover:text-red-500"}`}
-                  ></i>
-                  <span
-                    className={
-                      isLiked
-                        ? "text-white font-medium"
-                        : "text-moboxd-muted group-hover:text-white font-medium"
-                    }
+              <div className="px-4 py-3 border-t border-[#2A2A35] flex items-center justify-between">
+                {/* Left Side: Like & Comment */}
+                <div className="flex items-center gap-6">
+                  <button
+                    onClick={() => handleLike(post._id)}
+                    className="flex items-center gap-2 group transition-colors focus:outline-none"
                   >
-                    {post.likes?.length || 0}
-                  </span>
-                </button>
+                    <i
+                      className={`bi bi-heart${isLiked ? "-fill text-red-500" : " text-moboxd-muted group-hover:text-red-500"}`}
+                    ></i>
+                    <span
+                      className={
+                        isLiked
+                          ? "text-white font-medium"
+                          : "text-moboxd-muted group-hover:text-white font-medium"
+                      }
+                    >
+                      {post.likes?.length || 0}
+                    </span>
+                  </button>
 
-                <Link
-                  to={`/posts/${post._id}`}
-                  className="flex items-center gap-2 group transition-colors"
-                >
-                  <i className="bi bi-chat text-moboxd-muted group-hover:text-white"></i>
-                  <span className="text-moboxd-muted group-hover:text-white font-medium">
-                    {post.totalReviews}
-                  </span>
-                </Link>
+                  <Link
+                    to={`/posts/${post._id}`}
+                    className="flex items-center gap-2 group transition-colors"
+                  >
+                    <i className="bi bi-chat text-moboxd-muted group-hover:text-white"></i>
+                    <span className="text-moboxd-muted group-hover:text-white font-medium">
+                      {post.totalReviews}
+                    </span>
+                  </Link>
+                </div>
+
+                {/* Right Side: Share & Bookmark */}
+                <div className="flex items-center gap-5">
+                  {/* Share Button */}
+                  <button
+                    onClick={() => handleShare(post._id, post.author.username)}
+                    className="group transition-colors focus:outline-none flex items-center"
+                    title="Share"
+                  >
+                    <i className="text-lg bi bi-share text-moboxd-muted group-hover:text-white"></i>
+                  </button>
+
+                  {/* Bookmark Button */}
+                  <button
+                    onClick={() => handleBookmark(post._id)}
+                    className="group transition-colors focus:outline-none flex items-center"
+                    title="Save"
+                  >
+                    <i
+                      className={`text-lg bi bi-bookmark${user?.bookmarks?.includes(post._id) ? "-fill text-moboxd-accent" : " text-moboxd-muted group-hover:text-white"}`}
+                    ></i>
+                  </button>
+                </div>
               </div>
             </div>
           );
