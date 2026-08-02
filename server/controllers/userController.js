@@ -1,17 +1,17 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-const User = require('../models/User');
-const Post = require('../models/Post');
-const Activity = require('../models/Activity'); // IMPORT THE ACTIVITY MODEL
-const { OAuth2Client } = require('google-auth-library');
-const axios = require('axios');
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const User = require("../models/User");
+const Post = require("../models/Post");
+const Activity = require("../models/Activity"); // IMPORT THE ACTIVITY MODEL
+const { OAuth2Client } = require("google-auth-library");
+const axios = require("axios");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Generate JWT
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
+    expiresIn: "30d",
   });
 };
 
@@ -23,13 +23,13 @@ const registerUser = async (req, res) => {
     const { displayName, username, email, password } = req.body;
 
     if (!username || !email || !password) {
-      return res.status(400).json({ message: 'Please add all fields' });
+      return res.status(400).json({ message: "Please add all fields" });
     }
 
     // Check if user exists
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
+      return res.status(400).json({ message: "User already exists" });
     }
 
     // Hash password
@@ -47,16 +47,18 @@ const registerUser = async (req, res) => {
     if (user) {
       res.status(201).json({
         _id: user.id,
-        displayName: user.displayName,
         username: user.username,
         email: user.email,
+        displayName: user.displayName,
+        profilePicture: user.profilePicture, // ADDED
+        bio: user.bio, // ADDED
         token: generateToken(user._id),
       });
     } else {
-      res.status(400).json({ message: 'Invalid user data' });
+      res.status(400).json({ message: "Invalid user data" });
     }
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -76,33 +78,38 @@ const loginUser = async (req, res) => {
         _id: user.id,
         username: user.username,
         email: user.email,
+        displayName: user.displayName, // ADDED
+        profilePicture: user.profilePicture, // ADDED
+        bio: user.bio, // ADDED
         token: generateToken(user._id),
       });
     } else {
-      res.status(401).json({ message: 'Invalid credentials' });
+      res.status(401).json({ message: "Invalid credentials" });
     }
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
 const getUserProfile = async (req, res) => {
   try {
     // Find the user by username, exclude the password field
-    const user = await User.findOne({ username: req.params.username }).select('-password');
-    
+    const user = await User.findOne({ username: req.params.username }).select(
+      "-password",
+    );
+
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Find all posts authored by this user, newest first
     const posts = await Post.find({ author: user._id })
       .sort({ createdAt: -1 })
-      .populate('author', 'username profilePicture'); // Populate to match feed structure
+      .populate("author", "username profilePicture"); // Populate to match feed structure
 
     res.status(200).json({ user, posts });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -116,12 +123,14 @@ const searchUsers = async (req, res) => {
 
     // Perform a case-insensitive search
     const users = await User.find({
-      username: { $regex: keyword, $options: 'i' }
-    }).select('-password'); // Exclude passwords from the response
+      username: { $regex: keyword, $options: "i" },
+    }).select("-password"); // Exclude passwords from the response
 
     res.status(200).json(users);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to search users', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to search users", error: error.message });
   }
 };
 
@@ -147,16 +156,19 @@ const toggleFollow = async (req, res) => {
 
     if (isFollowing) {
       // Unfollow logic: Remove IDs from respective arrays
-      currentUser.following = currentUser.following.filter(id => id.toString() !== targetUserId);
-      targetUser.followers = targetUser.followers.filter(id => id.toString() !== currentUserId);
+      currentUser.following = currentUser.following.filter(
+        (id) => id.toString() !== targetUserId,
+      );
+      targetUser.followers = targetUser.followers.filter(
+        (id) => id.toString() !== currentUserId,
+      );
 
       // ACTIVITY TRIGGER: Remove the follow activity from the feed
       await Activity.findOneAndDelete({
         actor: currentUserId,
-        actionType: 'FOLLOW',
-        targetUser: targetUserId
+        actionType: "FOLLOW",
+        targetUser: targetUserId,
       });
-
     } else {
       // Follow logic: Add IDs to respective arrays
       currentUser.following.push(targetUserId);
@@ -165,8 +177,8 @@ const toggleFollow = async (req, res) => {
       // ACTIVITY TRIGGER: Log the follow activity
       await Activity.create({
         actor: currentUserId,
-        actionType: 'FOLLOW',
-        targetUser: targetUserId
+        actionType: "FOLLOW",
+        targetUser: targetUserId,
       });
     }
 
@@ -174,12 +186,16 @@ const toggleFollow = async (req, res) => {
     await targetUser.save();
 
     res.status(200).json({
-      message: isFollowing ? "Unfollowed successfully" : "Followed successfully",
+      message: isFollowing
+        ? "Unfollowed successfully"
+        : "Followed successfully",
       followers: targetUser.followers,
-      following: currentUser.following
+      following: currentUser.following,
     });
   } catch (error) {
-    res.status(500).json({ message: "Failed to toggle follow", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to toggle follow", error: error.message });
   }
 };
 
@@ -191,12 +207,14 @@ const updateProfile = async (req, res) => {
     const user = await User.findById(req.params.id);
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Ensure the logged-in user is only updating their own profile
     if (user._id.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: 'Not authorized to update this profile' });
+      return res
+        .status(401)
+        .json({ message: "Not authorized to update this profile" });
     }
 
     // Update basic text fields
@@ -224,17 +242,17 @@ const updateProfile = async (req, res) => {
       email: updatedUser.email,
       profilePicture: updatedUser.profilePicture,
       bio: updatedUser.bio,
-      token: req.headers.authorization.split(' ')[1] // Preserve the existing token
+      token: req.headers.authorization.split(" ")[1], // Preserve the existing token
     });
   } catch (error) {
-    console.error('Error updating profile:', error);
-    
+    console.error("Error updating profile:", error);
+
     // Handle specific MongoDB errors like duplicate usernames
     if (error.code === 11000) {
-       return res.status(400).json({ message: 'Username is already taken' });
+      return res.status(400).json({ message: "Username is already taken" });
     }
-    
-    res.status(500).json({ message: 'Server error updating profile' });
+
+    res.status(500).json({ message: "Server error updating profile" });
   }
 };
 
@@ -245,16 +263,18 @@ const googleAuth = async (req, res) => {
   const { token } = req.body; // This is now the access_token from the frontend
 
   if (!token) {
-    return res.status(400).json({ message: 'No authentication token provided' });
+    return res
+      .status(400)
+      .json({ message: "No authentication token provided" });
   }
 
   try {
     // 1. Fetch user data directly from Google using the access_token
     const googleResponse = await axios.get(
-      'https://www.googleapis.com/oauth2/v3/userinfo',
-      { headers: { Authorization: `Bearer ${token}` } }
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      { headers: { Authorization: `Bearer ${token}` } },
     );
-    
+
     // 2. Extract user data from Google's response
     const { email, name, picture, sub } = googleResponse.data;
 
@@ -263,9 +283,12 @@ const googleAuth = async (req, res) => {
 
     if (!user) {
       // Create a unique username based on their email prefix + random numbers
-      const baseUsername = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+      const baseUsername = email
+        .split("@")[0]
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .toLowerCase();
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-      
+
       // 4. Create the new user
       user = await User.create({
         displayName: name,
@@ -283,12 +306,12 @@ const googleAuth = async (req, res) => {
       username: user.username,
       email: user.email,
       profilePicture: user.profilePicture,
+      bio: user.bio, // ADDED
       token: generateToken(user._id),
     });
-
   } catch (error) {
-    console.error('Google Auth Error:', error.response?.data || error.message);
-    res.status(401).json({ message: 'Google authentication failed' });
+    console.error("Google Auth Error:", error.response?.data || error.message);
+    res.status(401).json({ message: "Google authentication failed" });
   }
 };
 

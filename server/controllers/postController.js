@@ -1,22 +1,25 @@
 const Post = require("../models/Post");
 const User = require("../models/User");
 const Review = require("../models/Review");
-const Activity = require("../models/Activity"); // 1. IMPORT THE ACTIVITY MODEL
+const Activity = require("../models/Activity"); 
+const Ranking = require("../models/Ranking"); 
 
 // @desc    Get all posts for the home feed
 // @route   GET /api/posts
 // @access  Public (for now)
 const getFeedPosts = async (req, res) => {
   try {
-    const posts = await Post.find()
+    const { category } = req.query;
+    // If a category is provided, use a case-insensitive regex search. Otherwise, fetch all.
+    const query = category ? { category: new RegExp(`^${category}$`, 'i') } : {};
+
+    const posts = await Post.find(query)
       .populate("author", "username profilePicture")
       .sort({ createdAt: -1 });
 
     res.status(200).json(posts);
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to fetch posts", error: error.message });
+    res.status(500).json({ message: "Failed to fetch posts", error: error.message });
   }
 };
 
@@ -265,6 +268,22 @@ const getPersonalFeed = async (req, res) => {
       .json({ message: "Failed to fetch personal feed", error: error.message });
   }
 };
+const getCategories = async (req, res) => {
+  try {
+    const postCategories = await Post.distinct('category');
+    const rankingCategories = await Ranking.distinct('category');
+    
+    // Combine, deduplicate, and remove any empty/null categories
+    const allCategories = [...new Set([...postCategories, ...rankingCategories])]
+      .filter(Boolean)
+      .sort(); // Alphabetical order
+
+    res.status(200).json(allCategories);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch categories", error: error.message });
+  }
+};
+
 
 module.exports = {
   getFeedPosts,
@@ -275,4 +294,6 @@ module.exports = {
   toggleLike,
   updatePost,
   getPersonalFeed,
+  getCategories,
+  getFeedPosts,
 };

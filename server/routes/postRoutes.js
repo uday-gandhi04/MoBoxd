@@ -9,6 +9,7 @@ const {
   deletePost,
   toggleLike,
   updatePost,
+  getCategories
 } = require("../controllers/postController");
 const { protect } = require("../middleware/authMiddleware");
 const { upload } = require("../config/cloudinary");
@@ -20,6 +21,8 @@ router.route("/")
 
 router.route("/feed")
   .get(protect, getPersonalFeed);
+
+router.get('/categories', getCategories);
 
 // Single post routes (/api/posts/:id)
 // Grouped all single-ID operations into one block
@@ -35,5 +38,7 @@ router.route("/:id/like")
 // Review routes (/api/posts/:id/reviews)
 router.route("/:id/reviews")
   .post(protect, addReview);
+
+
 
 module.exports = router;

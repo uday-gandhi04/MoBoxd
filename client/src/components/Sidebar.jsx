@@ -1,10 +1,27 @@
-import { useContext } from "react";
+import { useContext, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
+import axios from "axios";
 
 const Sidebar = ({ onOpenCreateModal }) => {
   const { user, logout } = useContext(AuthContext);
   const location = useLocation();
+  const [categories, setCategories] = useState([]);
+
+  // Fetch dynamic categories on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await axios.get(
+          "http://localhost:5000/api/posts/categories",
+        );
+        setCategories(res.data);
+      } catch (error) {
+        console.error("Failed to load categories", error);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   // Helper function to check if a link is active
   const isActive = (path) => location.pathname === path;
@@ -40,24 +57,23 @@ const Sidebar = ({ onOpenCreateModal }) => {
           </Link>
           <Link
             to="/rankings/new"
-            className="flex items-center gap-4 px-4 py-3 text-moboxd-muted hover:text-white hover:bg-[#2A2A35] rounded-xl transition-all"
+            className={`flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-colors ${isActive("/rankings/new") ? "bg-moboxd-card text-moboxd-accent" : "text-moboxd-muted hover:text-white hover:bg-[#2A2A35]"}`}
           >
             <i className="bi bi-list-ol text-xl"></i>
             <span className="font-bold tracking-wide">New Ranking</span>
           </Link>
           <Link
             to="/rankings"
-            className="flex items-center gap-4 px-4 py-3 text-moboxd-muted hover:text-white hover:bg-[#2A2A35] rounded-xl transition-all"
+            className={`flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-colors ${isActive("/rankings") ? "bg-moboxd-card text-moboxd-accent" : "text-moboxd-muted hover:text-white hover:bg-[#2A2A35]"}`}
           >
             <i className="bi bi-trophy text-xl"></i>
             <span className="font-bold tracking-wide">Rankings</span>
           </Link>
           <Link
             to="/activity"
-            className="flex items-center gap-4 px-4 py-3 text-moboxd-muted hover:text-white hover:bg-[#2A2A35] rounded-xl transition-all"
+            className={`flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-colors ${isActive("/activity") ? "bg-moboxd-card text-moboxd-accent" : "text-moboxd-muted hover:text-white hover:bg-[#2A2A35]"}`}
           >
-            <i className="bi bi-bell text-xl"></i>{" "}
-            {/* Or bi-activity, depending on your icon */}
+            <i className="bi bi-bell text-xl"></i>
             <span className="font-bold tracking-wide">Activity</span>
           </Link>
           <Link
@@ -87,34 +103,40 @@ const Sidebar = ({ onOpenCreateModal }) => {
           New Moment
         </button>
 
-        {/* Categories Section */}
+        {/* Categories Section (Dynamic) */}
         <div>
           <h3 className="text-xs font-bold text-moboxd-muted tracking-widest uppercase px-4 mb-4">
             Categories
           </h3>
           <div className="flex flex-col gap-1">
-            {["Food", "Places", "Music", "Entertainment", "Other"].map(
-              (cat) => (
-                <button
-                  key={cat}
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg text-sm text-moboxd-muted hover:text-white transition-colors text-left"
+            {categories.length > 0 ? (
+              categories.map((cat, index) => (
+                <Link
+                  key={index}
+                  to={`/category/${cat}`}
+                  className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm transition-colors text-left capitalize ${isActive(`/category/${cat}`) ? "bg-[#2A2A35] text-white" : "text-moboxd-muted hover:text-white hover:bg-[#1A1A21]"}`}
                 >
-                  <i
-                    className={`bi bi-${cat === "Food" ? "cup-hot" : cat === "Places" ? "geo-alt" : cat === "Music" ? "music-note" : cat === "Entertainment" ? "film" : "box"}`}
-                  ></i>
+                  <i className="bi bi-hash text-lg"></i>
                   {cat}
-                </button>
-              ),
+                </Link>
+              ))
+            ) : (
+              <span className="px-4 text-sm text-moboxd-muted">
+                No categories yet
+              </span>
             )}
           </div>
         </div>
       </div>
 
       {/* Bottom Section: User Profile Mini / Login */}
-      <div className="mt-auto">
+      <div className="mt-auto pt-6">
         {user ? (
           <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-3">
+            <Link
+              to={`/profile/${user.username}`}
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+            >
               <div className="w-10 h-10 rounded-full bg-[#2A2A35] flex items-center justify-center overflow-hidden">
                 {user.profilePicture ? (
                   <img
@@ -127,14 +149,15 @@ const Sidebar = ({ onOpenCreateModal }) => {
                 )}
               </div>
               <div className="flex flex-col">
+                {/* SHOW DISPLAY NAME HERE */}
                 <span className="text-sm font-bold text-white leading-tight">
-                  {user.username}
+                  {user.displayName || user.username}
                 </span>
                 <span className="text-xs text-moboxd-muted">
                   @{user.username.toLowerCase()}
                 </span>
               </div>
-            </div>
+            </Link>
             <button
               onClick={logout}
               className="text-moboxd-muted hover:text-red-400 transition-colors"

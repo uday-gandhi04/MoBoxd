@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams,useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import {
@@ -21,6 +21,7 @@ import { SortableItem } from './SortableItem';
 const RankingArena = () => {
   const { id } = useParams();
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   const [lobby, setLobby] = useState(null);
   const [items, setItems] = useState([]);
@@ -83,6 +84,51 @@ const RankingArena = () => {
     }
   };
 
+  const handleShare = async () => {
+  const url = window.location.href;
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: `Join my Ranking Battle: ${lobby.title}`,
+        url: url
+      });
+    } catch (err) {
+      console.log('Share cancelled', err);
+    }
+  } else {
+    navigator.clipboard.writeText(url);
+    alert('Link copied to clipboard!');
+  }
+};
+
+const handleDeleteLobby = async () => {
+  if (window.confirm("Are you sure you want to delete this entire ranking battle? This cannot be undone.")) {
+    try {
+      await axios.delete(`http://localhost:5000/api/rankings/${id}`, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      navigate('/rankings');
+    } catch (error) {
+      alert("Failed to delete lobby.");
+    }
+  }
+};
+
+const handleDeleteSubmission = async () => {
+  if (window.confirm("Delete your ranking? You can always resubmit later.")) {
+    try {
+      await axios.delete(`http://localhost:5000/api/rankings/${id}/my-submission`, {
+        headers: { Authorization: `Bearer ${user.token}` }
+      });
+      // Reset the local state to show the drag-and-drop board again
+      setHasSubmitted(false);
+      setItems(lobby.items); 
+    } catch (error) {
+      alert("Failed to delete submission.");
+    }
+  }
+};
+
   // Submit the final order to the backend
   const handleSubmitRanking = async () => {
     setSubmitting(true);
@@ -123,17 +169,41 @@ const RankingArena = () => {
   return (
     <div className="max-w-3xl mx-auto py-10 px-4">
       {/* Header */}
-      <div className="text-center mb-10 pb-8 border-b border-[#2A2A35]">
-        <span className="text-moboxd-accent text-xs font-bold uppercase tracking-widest bg-moboxd-accent/10 px-3 py-1 rounded-full mb-4 inline-block">
-          {lobby.category}
-        </span>
-        <h1 className="text-4xl font-extrabold text-white tracking-tight mt-2 mb-3">
-          {lobby.title}
-        </h1>
-        {lobby.description && <p className="text-moboxd-muted">{lobby.description}</p>}
-        <div className="mt-4 flex items-center justify-center gap-2 text-sm text-moboxd-muted font-medium">
-          Created by <span className="text-white">@{lobby.creator.username}</span>
+      <div className="mb-10 pb-8 border-b border-[#2A2A35]">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <span className="text-moboxd-accent text-xs font-bold uppercase tracking-widest bg-moboxd-accent/10 px-3 py-1 rounded-full mb-3 inline-block">
+              {lobby.category}
+            </span>
+            <h1 className="text-4xl font-extrabold text-white tracking-tight">
+              {lobby.title}
+            </h1>
+            <div className="mt-3 flex items-center gap-2 text-sm text-moboxd-muted font-medium">
+              Created by <span className="text-white">@{lobby.creator.username}</span>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleShare}
+              className="bg-[#1A1A21] hover:bg-[#2A2A35] border border-[#2A2A35] text-white px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2"
+            >
+              <i className="bi bi-share-fill"></i> Share
+            </button>
+
+            {/* Show Lobby Delete only if the logged-in user is the creator */}
+            {user._id === lobby.creator._id && (
+              <button 
+                onClick={handleDeleteLobby}
+                className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-500 px-4 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2"
+              >
+                <i className="bi bi-trash3-fill"></i> Delete Lobby
+              </button>
+            )}
+          </div>
         </div>
+        {lobby.description && <p className="text-moboxd-muted mt-4">{lobby.description}</p>}
       </div>
 
       {hasSubmitted ? (
@@ -167,6 +237,17 @@ const RankingArena = () => {
             ) : (
               <p className="text-moboxd-muted text-center py-10">Calculating results...</p>
             )}
+          </div>
+
+          {/* Retract Ranking Button */}
+          <div className="mt-8 pt-6 border-t border-[#2A2A35] text-center">
+            <button 
+              onClick={handleDeleteSubmission}
+              className="text-moboxd-muted hover:text-white text-sm font-bold transition-colors"
+            >
+              <i className="bi bi-arrow-counterclockwise mr-2"></i>
+              Retract my ranking & vote again
+            </button>
           </div>
         </div>
       ) : (

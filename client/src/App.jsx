@@ -12,6 +12,7 @@ import Activity from './components/Activity';
 import CreateRanking from './components/CreateRanking'; 
 import RankingArena from './components/RankingArena'; 
 import RankingsFeed from './components/RankingsFeed';
+import CategoryFeed from './components/CategoryFeed';
 
 function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -34,6 +35,7 @@ function App() {
           <Route path="/rankings/new" element={<CreateRanking />} />
           <Route path="/rankings/:id" element={<RankingArena />} />
           <Route path="/rankings" element={<RankingsFeed />} />
+          <Route path="/category/:categoryName" element={<CategoryFeed />} />
         </Routes>
       </main>
 

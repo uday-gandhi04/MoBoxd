@@ -26,6 +26,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    // ADD THE BIO FIELD HERE:
+    bio: {
+      type: String,
+      default: '',
+      maxLength: 150, // Keeps bios short and snappy, optional but recommended!
+    },
     // Add these two arrays:
     followers: [
       {

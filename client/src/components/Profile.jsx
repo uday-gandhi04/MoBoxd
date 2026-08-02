@@ -7,7 +7,7 @@ import EditProfileModal from "./EditProfileModal";
 const Profile = () => {
   const { username } = useParams();
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
+  const { user, setUser } = useContext(AuthContext);
 
   const [profileUser, setProfileUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
@@ -245,14 +245,30 @@ const Profile = () => {
           </Link>
         ))}
       </div>
-      
+
       {/* Edit Profile Modal */}
-      <EditProfileModal 
+      <EditProfileModal
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         profileData={profileUser}
         onUpdateSuccess={(updatedData) => {
-          setProfileUser(prev => ({ ...prev, ...updatedData }));
+          // 1. Update the local profile page UI
+          setProfileUser((prev) => ({ ...prev, ...updatedData }));
+
+          // 2. Update the global AuthContext so the Sidebar updates instantly!
+          if (setUser) {
+            setUser((prev) => ({ ...prev, ...updatedData }));
+
+            // Optional safety measure: If your AuthContext relies on localStorage to persist sessions,
+            // you might want to update it here so a page refresh doesn't revert the Sidebar.
+            const storedUser = JSON.parse(localStorage.getItem("user"));
+            if (storedUser) {
+              localStorage.setItem(
+                "user",
+                JSON.stringify({ ...storedUser, ...updatedData }),
+              );
+            }
+          }
         }}
       />
     </div>
