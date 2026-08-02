@@ -39,6 +39,20 @@ const Sidebar = ({ onOpenCreateModal }) => {
             Explore
           </Link>
           <Link
+            to="/rankings/new"
+            className="flex items-center gap-4 px-4 py-3 text-moboxd-muted hover:text-white hover:bg-[#2A2A35] rounded-xl transition-all"
+          >
+            <i className="bi bi-list-ol text-xl"></i>
+            <span className="font-bold tracking-wide">New Ranking</span>
+          </Link>
+          <Link
+            to="/rankings"
+            className="flex items-center gap-4 px-4 py-3 text-moboxd-muted hover:text-white hover:bg-[#2A2A35] rounded-xl transition-all"
+          >
+            <i className="bi bi-trophy text-xl"></i>
+            <span className="font-bold tracking-wide">Rankings</span>
+          </Link>
+          <Link
             to="/activity"
             className="flex items-center gap-4 px-4 py-3 text-moboxd-muted hover:text-white hover:bg-[#2A2A35] rounded-xl transition-all"
           >

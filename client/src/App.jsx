@@ -7,8 +7,11 @@ import Register from './components/Register';
 import PostDetail from './components/PostDetail';
 import Profile from './components/Profile';
 import Explore from './components/Explore';
-import CreatePostModal from './components/CreatePostModal'; // Import the new modal
-import Activity from './components/Activity'; // Import the Activity component
+import CreatePostModal from './components/CreatePostModal'; 
+import Activity from './components/Activity'; 
+import CreateRanking from './components/CreateRanking'; 
+import RankingArena from './components/RankingArena'; 
+import RankingsFeed from './components/RankingsFeed';
 
 function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -27,7 +30,10 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/posts/:id" element={<PostDetail />} />
           <Route path="/profile/:username" element={<Profile />} />
-          <Route path="/activity" element={<Activity />} /> {/* New Activity Route */}
+          <Route path="/activity" element={<Activity />} /> 
+          <Route path="/rankings/new" element={<CreateRanking />} />
+          <Route path="/rankings/:id" element={<RankingArena />} />
+          <Route path="/rankings" element={<RankingsFeed />} />
         </Routes>
       </main>
 
