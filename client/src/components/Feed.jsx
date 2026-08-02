@@ -8,7 +8,9 @@ const Feed = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const { user } = useContext(AuthContext);
+  const { user, setUser } = useContext(AuthContext);
+
+  const [savedPostIds, setSavedPostIds] = useState(user?.bookmarks || []);
 
   useEffect(() => {
     const fetchPersonalFeed = async () => {
@@ -55,17 +57,32 @@ const Feed = () => {
   };
 
   const handleBookmark = async (postId) => {
-    if (!user) return alert("Please log in to save moments.");
+    if (!user) return alert('Please log in to save moments.');
     try {
       const response = await axios.put(
         `http://localhost:5000/api/users/bookmarks/${postId}`,
         {},
-        { headers: { Authorization: `Bearer ${user.token}` } },
+        { headers: { Authorization: `Bearer ${user.token}` } }
       );
-      // Update the global user context immediately so the UI reacts
-      setUser((prev) => ({ ...prev, bookmarks: response.data }));
+      
+      const updatedBookmarks = response.data || [];
+
+      // 1. UPDATE LOCAL STATE (This forces the immediate UI visual toggle!)
+      setSavedPostIds(updatedBookmarks);
+
+      // 2. Update global state in the background
+      if (typeof setUser === 'function') {
+        setUser(prev => ({ ...prev, bookmarks: updatedBookmarks }));
+      }
+      
+      // 3. Update localStorage so a page refresh doesn't break it
+      const storedUser = JSON.parse(localStorage.getItem('user'));
+      if (storedUser) {
+        localStorage.setItem('user', JSON.stringify({ ...storedUser, bookmarks: updatedBookmarks }));
+      }
+      
     } catch (error) {
-      console.error("Error toggling bookmark:", error);
+      console.error('Error toggling bookmark:', error);
     }
   };
 
@@ -160,6 +177,11 @@ const Feed = () => {
         !error &&
         posts.map((post) => {
           const isLiked = post.likes?.includes(user._id);
+
+          const isBookmarked = Array.isArray(savedPostIds) && savedPostIds.some((bookmark) => {
+              const bookmarkId = typeof bookmark === "object" ? bookmark._id : bookmark;
+              return String(bookmarkId) === String(post._id);
+            });
 
           return (
             <div
@@ -279,10 +301,14 @@ const Feed = () => {
                   <button
                     onClick={() => handleBookmark(post._id)}
                     className="group transition-colors focus:outline-none flex items-center"
-                    title="Save"
+                    title={isBookmarked ? "Unsave" : "Save"}
                   >
                     <i
-                      className={`text-lg bi bi-bookmark${user?.bookmarks?.includes(post._id) ? "-fill text-moboxd-accent" : " text-moboxd-muted group-hover:text-white"}`}
+                      className={`text-lg bi ${
+                        isBookmarked
+                          ? "bi-bookmark-fill text-moboxd-accent"
+                          : "bi-bookmark text-moboxd-muted group-hover:text-white"
+                      }`}
                     ></i>
                   </button>
                 </div>

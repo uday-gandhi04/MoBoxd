@@ -326,6 +326,9 @@ const googleAuth = async (req, res) => {
 // @desc    Toggle bookmark on a post
 // @route   PUT /api/users/bookmarks/:postId
 // @access  Private
+// @desc    Toggle bookmark on a post
+// @route   PUT /api/users/bookmarks/:postId
+// @access  Private
 const toggleBookmark = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
@@ -335,13 +338,18 @@ const toggleBookmark = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const isBookmarked = user.bookmarks.includes(postId);
+    // THE FIX: Convert both to strings before comparing!
+    const isBookmarked = user.bookmarks.some(
+      (id) => id.toString() === postId.toString()
+    );
 
     if (isBookmarked) {
-      // Remove from bookmarks
-      user.bookmarks = user.bookmarks.filter(id => id.toString() !== postId);
+      // Unsave: Filter it out of the array
+      user.bookmarks = user.bookmarks.filter(
+        (id) => id.toString() !== postId.toString()
+      );
     } else {
-      // Add to bookmarks
+      // Save: Add it to the array
       user.bookmarks.push(postId);
     }
 
