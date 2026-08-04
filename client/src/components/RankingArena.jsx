@@ -16,6 +16,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableItem } from './SortableItem';
 
 const RankingArena = () => {
@@ -264,6 +265,7 @@ const handleDeleteSubmission = async () => {
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
+            modifiers={[restrictToVerticalAxis]}
           >
             <SortableContext 
               items={items.map(item => item._id)}

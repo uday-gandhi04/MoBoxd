@@ -45,8 +45,12 @@ export const SortableItem = ({ id, item, index }) => {
       </div>
 
       {/* Drag Handle Icon */}
-      <div className="text-moboxd-muted opacity-50">
-        <i className="bi bi-grip-vertical text-2xl"></i>
+      <div 
+        {...attributes} 
+        {...listeners} 
+        className="text-moboxd-muted touch-none cursor-grab active:cursor-grabbing p-2 opacity-50"
+      >
+        <i className="bi bi-grip-vertical"></i>
       </div>
     </div>
   );
