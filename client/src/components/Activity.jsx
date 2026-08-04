@@ -5,17 +5,78 @@ import { AuthContext } from "../context/AuthContext";
 import { formatDistanceToNow } from "date-fns"; // Run: npm install date-fns
 
 const Activity = () => {
-  const { user } = useContext(AuthContext);
+  const { user, setUser } = useContext(AuthContext);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [followLoading, setFollowLoading] = useState({});
+
+  const handleFollowToggle = async (targetUserId) => {
+    if (!user) return;
+
+    if (followLoading[targetUserId]) return;
+
+    setFollowLoading((prev) => ({
+      ...prev,
+      [targetUserId]: true,
+    }));
+
+    const oldFollowing =
+      user.following?.map((id) => (typeof id === "object" ? id._id : id)) || [];
+
+    setUser((prev) => {
+      const isFollowing = oldFollowing.includes(targetUserId);
+
+      const updatedFollowing = isFollowing
+        ? oldFollowing.filter((id) => id !== targetUserId)
+        : [...oldFollowing, targetUserId];
+
+      return {
+        ...prev,
+        following: updatedFollowing,
+      };
+    });
+
+    try {
+      const res = await axios.put(
+        `${import.meta.env.VITE_API_URL}/api/users/${targetUserId}/follow`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        },
+      );
+
+      setUser((prev) => ({
+        ...prev,
+        following: res.data.following,
+      }));
+    } catch (err) {
+      setUser((prev) => ({
+        ...prev,
+        following: oldFollowing,
+      }));
+
+      console.error(err);
+    } finally {
+      setFollowLoading((prev) => ({
+        ...prev,
+        [targetUserId]: false,
+      }));
+    }
+  };
+
   useEffect(() => {
     const fetchActivity = async () => {
       try {
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/activity`, {
-          headers: { Authorization: `Bearer ${user.token}` },
-        });
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/activity`,
+          {
+            headers: { Authorization: `Bearer ${user.token}` },
+          },
+        );
         setActivities(response.data);
         setLoading(false);
       } catch (err) {
@@ -25,24 +86,7 @@ const Activity = () => {
     };
 
     if (user) fetchActivity();
-  }, [user]);
-
-  const handleFollowBack = async (targetUserId) => {
-    try {
-      await axios.put(
-        `${import.meta.env.VITE_API_URL}/api/users/${targetUserId}/follow`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${user.token}` },
-        },
-      );
-      // Optional: You can add local state here to change the button icon
-      // from "Follow Back" to a checkmark or "Following" so it feels responsive.
-      alert("Followed back successfully!");
-    } catch (err) {
-      console.error("Failed to follow back");
-    }
-  };
+  }, [user?.token]);
 
   // Helper to render the activity text dynamically
   const renderActivityContent = (activity) => {
@@ -120,6 +164,10 @@ const Activity = () => {
     );
   }
 
+  const currentFollowingIds = new Set(
+    user?.following?.map((id) => (typeof id === "object" ? id._id : id)) || [],
+  );
+
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 min-h-screen">
       <div className="border-b border-[#2A2A35] mb-6 pb-4">
@@ -196,13 +244,36 @@ const Activity = () => {
                       <i className="bi bi-trophy-fill text-lg"></i>
                     </div>
                   </Link>
-                ) : activity.actionType === "FOLLOW" ? (
+                ) : activity.actionType === "FOLLOW" &&
+                  activity.actor._id !== user._id ? (
                   <button
-                    onClick={() => handleFollowBack(activity.actor._id)}
-                    className="w-10 h-10 rounded-full bg-moboxd-accent/10 text-moboxd-accent hover:bg-moboxd-accent hover:text-black transition-colors flex items-center justify-center"
-                    title="Follow Back"
+                    disabled={followLoading[activity.actor._id]}
+                    onClick={() => handleFollowToggle(activity.actor._id)}
+                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all
+${
+  currentFollowingIds.has(activity.actor._id)
+    ? "bg-[#2A2A35] text-moboxd-accent border border-moboxd-accent"
+    : "bg-moboxd-accent text-black hover:bg-yellow-400"
+}
+${followLoading[activity.actor._id] ? " opacity-50 cursor-not-allowed" : ""}
+`}
+                    title={
+                      currentFollowingIds.has(activity.actor._id)
+                        ? "Unfollow"
+                        : "Follow Back"
+                    }
                   >
-                    <i className="bi bi-person-plus-fill"></i>
+                    {followLoading[activity.actor._id] ? (
+                      <i className="bi bi-arrow-repeat animate-spin"></i>
+                    ) : (
+                      <i
+                        className={`bi ${
+                          currentFollowingIds.has(activity.actor._id)
+                            ? "bi-person-check-fill"
+                            : "bi-person-plus-fill"
+                        }`}
+                      />
+                    )}
                   </button>
                 ) : null}
               </div>

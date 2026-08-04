@@ -36,7 +36,7 @@ const Feed = () => {
     };
 
     fetchPersonalFeed();
-  }, [user]);
+  }, [user?.token]);
 
   const handleLike = async (postId) => {
     if (!user) return alert("Please log in to like moments.");
@@ -56,35 +56,72 @@ const Feed = () => {
     }
   };
 
+  const [bookmarkLoading, setBookmarkLoading] = useState({});
+
   const handleBookmark = async (postId) => {
-    if (!user) return alert('Please log in to save moments.');
+    if (!user) return alert("Please log in to save moments.");
+
+    if (bookmarkLoading[postId]) return;
+
+    setBookmarkLoading((prev) => ({
+      ...prev,
+      [postId]: true,
+    }));
+
+    const oldBookmarks =
+      user.bookmarks?.map((id) => (typeof id === "object" ? id._id : id)) || [];
+
+    const isBookmarked = oldBookmarks.includes(postId);
+
+    const updatedBookmarks = isBookmarked
+      ? oldBookmarks.filter((id) => id !== postId)
+      : [...oldBookmarks, postId];
+
+    // Optimistic update
+    setSavedPostIds(updatedBookmarks);
+
+    setUser((prev) => ({
+      ...prev,
+      bookmarks: updatedBookmarks,
+    }));
+
     try {
-      const response = await axios.put(
+      const res = await axios.put(
         `${import.meta.env.VITE_API_URL}/api/users/bookmarks/${postId}`,
         {},
-        { headers: { Authorization: `Bearer ${user.token}` } }
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        },
       );
-      
-      const updatedBookmarks = response.data || [];
 
-      // 1. UPDATE LOCAL STATE (This forces the immediate UI visual toggle!)
-      setSavedPostIds(updatedBookmarks);
+      setSavedPostIds(res.data);
 
-      // 2. Update global state in the background
-      if (typeof setUser === 'function') {
-        setUser(prev => ({ ...prev, bookmarks: updatedBookmarks }));
-      }
-      
-      // 3. Update localStorage so a page refresh doesn't break it
-      const storedUser = JSON.parse(localStorage.getItem('user'));
-      if (storedUser) {
-        localStorage.setItem('user', JSON.stringify({ ...storedUser, bookmarks: updatedBookmarks }));
-      }
-      
-    } catch (error) {
-      console.error('Error toggling bookmark:', error);
+      setUser((prev) => ({
+        ...prev,
+        bookmarks: res.data,
+      }));
+    } catch (err) {
+      setSavedPostIds(oldBookmarks);
+
+      setUser((prev) => ({
+        ...prev,
+        bookmarks: oldBookmarks,
+      }));
+
+      console.error(err);
+    } finally {
+      setBookmarkLoading((prev) => ({
+        ...prev,
+        [postId]: false,
+      }));
     }
   };
+
+  useEffect(() => {
+    setSavedPostIds(user?.bookmarks || []);
+}, [user?.bookmarks]);
 
   const handleShare = async (postId, authorName) => {
     // Construct the absolute URL to the specific post
@@ -174,12 +211,16 @@ const Feed = () => {
 
       {/* Posts Feed */}
       {!loading &&
-        !error && Array.isArray(posts) && 
+        !error &&
+        Array.isArray(posts) &&
         posts.map((post) => {
           const isLiked = post.likes?.includes(user._id);
 
-          const isBookmarked = Array.isArray(savedPostIds) && savedPostIds.some((bookmark) => {
-              const bookmarkId = typeof bookmark === "object" ? bookmark._id : bookmark;
+          const isBookmarked =
+            Array.isArray(savedPostIds) &&
+            savedPostIds.some((bookmark) => {
+              const bookmarkId =
+                typeof bookmark === "object" ? bookmark._id : bookmark;
               return String(bookmarkId) === String(post._id);
             });
 
@@ -299,6 +340,7 @@ const Feed = () => {
 
                   {/* Bookmark Button */}
                   <button
+                    disabled={bookmarkLoading[post._id]}
                     onClick={() => handleBookmark(post._id)}
                     className="group transition-colors focus:outline-none flex items-center"
                     title={isBookmarked ? "Unsave" : "Save"}
