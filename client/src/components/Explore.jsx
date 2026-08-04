@@ -16,7 +16,7 @@ const Explore = () => {
   useEffect(() => {
     const fetchGlobalPosts = async () => {
       try {
-        const response = await axios.get('http://localhost:5000/api/posts');
+        const response = await axios.get('import.meta.env.VITE_API_URL/api/posts');
         setGlobalPosts(response.data);
       } catch (error) {
         console.error('Error fetching global posts:', error);
@@ -36,7 +36,7 @@ const Explore = () => {
       }
       setLoading(true);
       try {
-        const response = await axios.get(`http://localhost:5000/api/users/search?q=${searchQuery}`);
+        const response = await axios.get(`import.meta.env.VITE_API_URL/api/users/search?q=${searchQuery}`);
         setSearchResults(response.data);
       } catch (error) {
         console.error('Search failed:', error);
@@ -57,7 +57,7 @@ const Explore = () => {
 
     try {
       const response = await axios.put(
-        `http://localhost:5000/api/posts/${postId}/like`,
+        `import.meta.env.VITE_API_URL/api/posts/${postId}/like`,
         {},
         { headers: { Authorization: `Bearer ${user.token}` } }
       );

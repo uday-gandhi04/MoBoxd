@@ -19,8 +19,8 @@ const CategoryFeed = () => {
       try {
         let endpoint =
           activeTab === "MOMENTS"
-            ? `http://localhost:5000/api/posts?category=${categoryName}`
-            : `http://localhost:5000/api/rankings/feed?category=${categoryName}`;
+            ? `import.meta.env.VITE_API_URL/api/posts?category=${categoryName}`
+            : `import.meta.env.VITE_API_URL/api/rankings/feed?category=${categoryName}`;
 
         const config =
           activeTab === "RANKINGS" && user

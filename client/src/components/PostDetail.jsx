@@ -20,7 +20,7 @@ const PostDetail = () => {
   useEffect(() => {
     const fetchPost = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/api/posts/${id}`);
+        const response = await axios.get(`import.meta.env.VITE_API_URL/api/posts/${id}`);
         // Safely extract the post whether the backend wraps it in { post: {...} } or sends it directly
         const fetchedPost = response.data.post || response.data;
         setPost(fetchedPost);
@@ -36,7 +36,7 @@ const PostDetail = () => {
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this moment?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/posts/${id}`, {
+        await axios.delete(`import.meta.env.VITE_API_URL/api/posts/${id}`, {
           headers: { Authorization: `Bearer ${user?.token}` }
         });
         navigate('/');
@@ -50,7 +50,7 @@ const PostDetail = () => {
     if (!user) return alert('Please log in to like moments.');
     try {
       const response = await axios.put(
-        `http://localhost:5000/api/posts/${id}/like`,
+        `import.meta.env.VITE_API_URL/api/posts/${id}/like`,
         {},
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
@@ -77,7 +77,7 @@ const PostDetail = () => {
     setSubmitting(true);
     try {
       const response = await axios.post(
-        `http://localhost:5000/api/posts/${id}/reviews`,
+        `import.meta.env.VITE_API_URL/api/posts/${id}/reviews`,
         { comment: reviewText, rating: reviewRating },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );

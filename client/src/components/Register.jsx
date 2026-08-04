@@ -23,7 +23,7 @@ const Register = () => {
         setError('');
         
         // Send the access_token directly to our backend
-        const response = await axios.post('http://localhost:5000/api/users/google', {
+        const response = await axios.post('import.meta.env.VITE_API_URL/api/users/google', {
            token: tokenResponse.access_token 
         });
         
@@ -52,7 +52,7 @@ const Register = () => {
 
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/users/register",
+        "import.meta.env.VITE_API_URL/api/users/register",
         {
           displayName,
           username,

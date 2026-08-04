@@ -13,7 +13,7 @@ const Activity = () => {
   useEffect(() => {
     const fetchActivity = async () => {
       try {
-        const response = await axios.get("http://localhost:5000/api/activity", {
+        const response = await axios.get("import.meta.env.VITE_API_URL/api/activity", {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         setActivities(response.data);
@@ -30,7 +30,7 @@ const Activity = () => {
   const handleFollowBack = async (targetUserId) => {
     try {
       await axios.put(
-        `http://localhost:5000/api/users/${targetUserId}/follow`,
+        `import.meta.env.VITE_API_URL/api/users/${targetUserId}/follow`,
         {},
         {
           headers: { Authorization: `Bearer ${user.token}` },

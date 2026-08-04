@@ -52,7 +52,7 @@ const EditProfileModal = ({ isOpen, onClose, profileData, onUpdateSuccess }) => 
       const userId = user?._id || user?.id;
 
       const response = await axios.put(
-        `http://localhost:5000/api/users/${userId}`, 
+        `import.meta.env.VITE_API_URL/api/users/${userId}`, 
         formData, 
         {
           headers: {
