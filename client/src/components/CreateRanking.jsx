@@ -133,7 +133,7 @@ const CreateRanking = () => {
 
             <div className="flex flex-col gap-3">
               {items.map((item, index) => (
-                <div key={index} className="flex items-center gap-3">
+                <div key={index} className="flex items-center gap-2 md:gap-4 mb-3">
                   <div className="w-8 h-8 rounded-full bg-[#2A2A35] text-moboxd-muted flex items-center justify-center font-bold shrink-0">
                     {index + 1}
                   </div>
