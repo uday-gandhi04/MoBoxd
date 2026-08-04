@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
+import MobileHeader from './components/MobileHeader'; // ADDED
+import BottomNav from './components/BottomNav';       // ADDED
 import Feed from './components/Feed';
 import Login from './components/Login';
 import Register from './components/Register';
@@ -20,10 +22,14 @@ function App() {
   return (
     <div className="flex h-screen bg-moboxd-bg text-moboxd-text overflow-hidden font-sans">
       
-      {/* Pass the open function to the Sidebar */}
+      {/* Mobile Header (Hidden on Desktop) */}
+      <MobileHeader />
+
+      {/* Desktop Sidebar */}
       <Sidebar onOpenCreateModal={() => setIsCreateModalOpen(true)} />
 
-      <main className="flex-1 overflow-y-auto custom-scrollbar">
+      {/* Main Content Area (Added pt-16 and pb-20 for mobile navs, reset on md screens) */}
+      <main className="flex-1 overflow-y-auto custom-scrollbar pt-16 pb-20 md:pt-0 md:pb-0 w-full relative">
         <Routes>
           <Route path="/" element={<Feed />} />
           <Route path="/explore" element={<Explore />} />
@@ -38,6 +44,9 @@ function App() {
           <Route path="/category/:categoryName" element={<CategoryFeed />} />
         </Routes>
       </main>
+
+      {/* Mobile Bottom Nav (Hidden on Desktop) */}
+      <BottomNav onOpenCreateModal={() => setIsCreateModalOpen(true)} />
 
       {/* Render the Modal at the root level */}
       <CreatePostModal 

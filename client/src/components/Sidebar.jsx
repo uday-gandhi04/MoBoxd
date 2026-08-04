@@ -27,7 +27,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <aside className="w-64 h-screen border-r border-[#2A2A35] bg-moboxd-bg flex flex-col justify-between py-6 px-4 sticky top-0 overflow-y-auto custom-scrollbar">
+    <aside className="hidden md:flex w-64 h-screen border-r border-[#2A2A35] bg-moboxd-bg flex flex-col justify-between py-6 px-4 sticky top-0 overflow-y-auto custom-scrollbar">
       {/* Top Section: Logo & Nav Links */}
       <div>
         <Link
