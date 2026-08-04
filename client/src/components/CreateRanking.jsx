@@ -51,7 +51,7 @@ const CreateRanking = () => {
 
     try {
       const response = await axios.post(
-        'import.meta.env.VITE_API_URL/api/rankings',
+        '${import.meta.env.VITE_API_URL}/api/rankings',
         {
           title,
           description,

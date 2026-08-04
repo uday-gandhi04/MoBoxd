@@ -54,7 +54,7 @@ const CreatePostModal = ({ isOpen, onClose, onPostCreated }) => {
     formData.append('image', imageFile);
 
     try {
-      await axios.post('import.meta.env.VITE_API_URL/api/posts', formData, {
+      await axios.post('${import.meta.env.VITE_API_URL}/api/posts', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
           Authorization: `Bearer ${user.token}`,

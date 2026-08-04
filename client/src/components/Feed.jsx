@@ -21,7 +21,7 @@ const Feed = () => {
       setLoading(true);
       try {
         const response = await axios.get(
-          "import.meta.env.VITE_API_URL/api/posts/feed",
+          "${import.meta.env.VITE_API_URL}/api/posts/feed",
           {
             headers: { Authorization: `Bearer ${user.token}` },
           },
@@ -42,7 +42,7 @@ const Feed = () => {
     if (!user) return alert("Please log in to like moments.");
     try {
       const response = await axios.put(
-        `import.meta.env.VITE_API_URL/api/posts/${postId}/like`,
+        `${import.meta.env.VITE_API_URL}/api/posts/${postId}/like`,
         {},
         { headers: { Authorization: `Bearer ${user.token}` } },
       );
@@ -60,7 +60,7 @@ const Feed = () => {
     if (!user) return alert('Please log in to save moments.');
     try {
       const response = await axios.put(
-        `import.meta.env.VITE_API_URL/api/users/bookmarks/${postId}`,
+        `${import.meta.env.VITE_API_URL}/api/users/bookmarks/${postId}`,
         {},
         { headers: { Authorization: `Bearer ${user.token}` } }
       );

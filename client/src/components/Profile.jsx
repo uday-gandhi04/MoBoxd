@@ -47,7 +47,7 @@ const Profile = () => {
       setLoading(true);
       try {
         const response = await axios.get(
-          `import.meta.env.VITE_API_URL/api/users/${username}`,
+          `${import.meta.env.VITE_API_URL}/api/users/${username}`,
         );
         const fetchedUser = response.data.user;
 
@@ -79,7 +79,7 @@ const Profile = () => {
       if (activeTab === 'SAVED' && user && user.username === profileUser?.username) {
         setLoadingSaved(true);
         try {
-          const response = await axios.get('import.meta.env.VITE_API_URL/api/users/bookmarks', {
+          const response = await axios.get('${import.meta.env.VITE_API_URL}/api/users/bookmarks', {
             headers: { Authorization: `Bearer ${user.token}` }
           });
           setSavedPosts(response.data);
@@ -97,7 +97,7 @@ const Profile = () => {
     if (!user) return alert("You must be logged in to follow users.");
     try {
       await axios.put(
-        `import.meta.env.VITE_API_URL/api/users/${profileUser._id}/follow`,
+        `${import.meta.env.VITE_API_URL}/api/users/${profileUser._id}/follow`,
         {},
         { headers: { Authorization: `Bearer ${user.token}` } },
       );

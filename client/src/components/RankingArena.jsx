@@ -42,13 +42,13 @@ const RankingArena = () => {
     const fetchArenaData = async () => {
       try {
         // 1. Fetch the lobby details
-        const lobbyRes = await axios.get(`import.meta.env.VITE_API_URL/api/rankings/${id}`, {
+        const lobbyRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/rankings/${id}`, {
           headers: { Authorization: `Bearer ${user.token}` }
         });
         setLobby(lobbyRes.data);
         
         // 2. Check if the user already submitted
-        const subRes = await axios.get(`import.meta.env.VITE_API_URL/api/rankings/${id}/my-submission`, {
+        const subRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/rankings/${id}/my-submission`, {
           headers: { Authorization: `Bearer ${user.token}` }
         });
 
@@ -104,7 +104,7 @@ const RankingArena = () => {
 const handleDeleteLobby = async () => {
   if (window.confirm("Are you sure you want to delete this entire ranking battle? This cannot be undone.")) {
     try {
-      await axios.delete(`import.meta.env.VITE_API_URL/api/rankings/${id}`, {
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/rankings/${id}`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       navigate('/rankings');
@@ -117,7 +117,7 @@ const handleDeleteLobby = async () => {
 const handleDeleteSubmission = async () => {
   if (window.confirm("Delete your ranking? You can always resubmit later.")) {
     try {
-      await axios.delete(`import.meta.env.VITE_API_URL/api/rankings/${id}/my-submission`, {
+      await axios.delete(`${import.meta.env.VITE_API_URL}/api/rankings/${id}/my-submission`, {
         headers: { Authorization: `Bearer ${user.token}` }
       });
       // Reset the local state to show the drag-and-drop board again
@@ -141,7 +141,7 @@ const handleDeleteSubmission = async () => {
 
     try {
       const response = await axios.post(
-        `import.meta.env.VITE_API_URL/api/rankings/${id}/submit`,
+        `${import.meta.env.VITE_API_URL}/api/rankings/${id}/submit`,
         { rankedItems },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
