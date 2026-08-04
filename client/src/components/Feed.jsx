@@ -21,7 +21,7 @@ const Feed = () => {
       setLoading(true);
       try {
         const response = await axios.get(
-          "${import.meta.env.VITE_API_URL}/api/posts/feed",
+          `${import.meta.env.VITE_API_URL}/api/posts/feed`,
           {
             headers: { Authorization: `Bearer ${user.token}` },
           },

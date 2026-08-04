@@ -13,7 +13,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
     const fetchCategories = async () => {
       try {
         const res = await axios.get(
-          "${import.meta.env.VITE_API_URL}/api/posts/categories",
+          `${import.meta.env.VITE_API_URL}/api/posts/categories`,
         );
         setCategories(res.data);
       } catch (error) {

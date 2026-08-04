@@ -13,7 +13,7 @@ const Activity = () => {
   useEffect(() => {
     const fetchActivity = async () => {
       try {
-        const response = await axios.get("${import.meta.env.VITE_API_URL}/api/activity", {
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/activity`, {
           headers: { Authorization: `Bearer ${user.token}` },
         });
         setActivities(response.data);

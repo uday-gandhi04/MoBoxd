@@ -16,7 +16,7 @@ const Explore = () => {
   useEffect(() => {
     const fetchGlobalPosts = async () => {
       try {
-        const response = await axios.get('${import.meta.env.VITE_API_URL}/api/posts');
+        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/posts`);
         setGlobalPosts(response.data);
       } catch (error) {
         console.error('Error fetching global posts:', error);

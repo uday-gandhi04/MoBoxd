@@ -79,7 +79,7 @@ const Profile = () => {
       if (activeTab === 'SAVED' && user && user.username === profileUser?.username) {
         setLoadingSaved(true);
         try {
-          const response = await axios.get('${import.meta.env.VITE_API_URL}/api/users/bookmarks', {
+          const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/users/bookmarks`, {
             headers: { Authorization: `Bearer ${user.token}` }
           });
           setSavedPosts(response.data);
