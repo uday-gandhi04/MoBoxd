@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
@@ -7,14 +7,16 @@ const Feed = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [bookmarkLoading, setBookmarkLoading] = useState({});
+  const [likeLoading, setLikeLoading] = useState({});
 
   const { user, setUser } = useContext(AuthContext);
 
-  const [savedPostIds, setSavedPostIds] = useState(user?.bookmarks || []);
-
+  // 1. Fetch feed strictly on mount or when the auth token changes.
+  // This prevents the feed from jumping or reloading when interacting with posts.
   useEffect(() => {
     const fetchPersonalFeed = async () => {
-      if (!user) {
+      if (!user?.token) {
         setLoading(false);
         return;
       }
@@ -22,9 +24,7 @@ const Feed = () => {
       try {
         const response = await axios.get(
           `${import.meta.env.VITE_API_URL}/api/posts/feed`,
-          {
-            headers: { Authorization: `Bearer ${user.token}` },
-          },
+          { headers: { Authorization: `Bearer ${user.token}` } }
         );
         setPosts(response.data);
       } catch (err) {
@@ -38,95 +38,117 @@ const Feed = () => {
     fetchPersonalFeed();
   }, [user?.token]);
 
-  const handleLike = async (postId) => {
+  // 2. Memoize bookmarks into an O(1) Set lookup.
+  // This prevents running .some() on every post during every render.
+  const bookmarkedIds = useMemo(() => {
+    const ids = user?.bookmarks?.map((id) =>
+      String(typeof id === "object" ? id._id : id)
+    ) || [];
+    return new Set(ids);
+  }, [user?.bookmarks]);
+
+  // 3. Optimistic Like Functionality
+  const handleLike = useCallback(async (e, postId) => {
+    e.preventDefault();
+    e.stopPropagation();
+
     if (!user) return alert("Please log in to like moments.");
+    if (likeLoading[postId]) return;
+
+    setLikeLoading((prev) => ({ ...prev, [postId]: true }));
+
+    const previousPosts = [...posts];
+
+    // Optimistic UI Update
+    setPosts((currentPosts) =>
+      currentPosts.map((post) => {
+        if (post._id === postId) {
+          const isLiked = post.likes?.includes(user._id);
+          const newLikes = isLiked
+            ? post.likes.filter((id) => id !== user._id)
+            : [...(post.likes || []), user._id];
+          return { ...post, likes: newLikes };
+        }
+        return post;
+      })
+    );
+
     try {
       const response = await axios.put(
         `${import.meta.env.VITE_API_URL}/api/posts/${postId}/like`,
         {},
-        { headers: { Authorization: `Bearer ${user.token}` } },
+        { headers: { Authorization: `Bearer ${user.token}` } }
       );
-      setPosts(
-        posts.map((post) =>
-          post._id === postId ? { ...post, likes: response.data } : post,
-        ),
+
+      // Sync with the backend's absolute truth
+      setPosts((currentPosts) =>
+        currentPosts.map((post) =>
+          post._id === postId ? { ...post, likes: response.data } : post
+        )
       );
     } catch (error) {
       console.error("Error toggling like:", error);
+      // Revert if API fails
+      setPosts(previousPosts);
+    } finally {
+      setLikeLoading((prev) => ({ ...prev, [postId]: false }));
     }
-  };
+  }, [user, posts, likeLoading]);
 
-  const [bookmarkLoading, setBookmarkLoading] = useState({});
+  // 4. Optimistic Bookmark Functionality
+  const handleBookmark = useCallback(async (e, postId) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-  const handleBookmark = async (postId) => {
     if (!user) return alert("Please log in to save moments.");
-
     if (bookmarkLoading[postId]) return;
 
-    setBookmarkLoading((prev) => ({
-      ...prev,
-      [postId]: true,
-    }));
+    setBookmarkLoading((prev) => ({ ...prev, [postId]: true }));
 
-    const oldBookmarks =
-      user.bookmarks?.map((id) => (typeof id === "object" ? id._id : id)) || [];
+    const oldBookmarks = user.bookmarks || [];
+    const isBookmarked = bookmarkedIds.has(String(postId));
 
-    const isBookmarked = oldBookmarks.includes(postId);
-
+    // Calculate new array ensuring we extract proper IDs
     const updatedBookmarks = isBookmarked
-      ? oldBookmarks.filter((id) => id !== postId)
+      ? oldBookmarks.filter((id) => {
+          const bId = typeof id === "object" ? id._id : id;
+          return String(bId) !== String(postId);
+        })
       : [...oldBookmarks, postId];
 
-    // Optimistic update
-    setSavedPostIds(updatedBookmarks);
-
-    setUser((prev) => ({
-      ...prev,
-      bookmarks: updatedBookmarks,
-    }));
+    // Optimistic UI Update (AuthContext handles localStorage synchronization natively)
+    if (typeof setUser === "function") {
+      setUser((prev) => ({ ...prev, bookmarks: updatedBookmarks }));
+    }
 
     try {
       const res = await axios.put(
         `${import.meta.env.VITE_API_URL}/api/users/bookmarks/${postId}`,
         {},
-        {
-          headers: {
-            Authorization: `Bearer ${user.token}`,
-          },
-        },
+        { headers: { Authorization: `Bearer ${user.token}` } }
       );
 
-      setSavedPostIds(res.data);
-
-      setUser((prev) => ({
-        ...prev,
-        bookmarks: res.data,
-      }));
+      // Sync with the backend's absolute truth
+      if (typeof setUser === "function") {
+        setUser((prev) => ({ ...prev, bookmarks: res.data || [] }));
+      }
     } catch (err) {
-      setSavedPostIds(oldBookmarks);
-
-      setUser((prev) => ({
-        ...prev,
-        bookmarks: oldBookmarks,
-      }));
-
-      console.error(err);
+      console.error("Error toggling bookmark:", err);
+      // Revert if API fails
+      if (typeof setUser === "function") {
+        setUser((prev) => ({ ...prev, bookmarks: oldBookmarks }));
+      }
     } finally {
-      setBookmarkLoading((prev) => ({
-        ...prev,
-        [postId]: false,
-      }));
+      setBookmarkLoading((prev) => ({ ...prev, [postId]: false }));
     }
-  };
+  }, [user, bookmarkedIds, bookmarkLoading, setUser]);
 
-  useEffect(() => {
-    setSavedPostIds(user?.bookmarks || []);
-}, [user?.bookmarks]);
+  // 5. Memoized Share Handler
+  const handleShare = useCallback(async (e, postId, authorName) => {
+    e.preventDefault();
+    e.stopPropagation();
 
-  const handleShare = async (postId, authorName) => {
-    // Construct the absolute URL to the specific post
     const url = `${window.location.origin}/posts/${postId}`;
-
     if (navigator.share) {
       try {
         await navigator.share({
@@ -137,11 +159,10 @@ const Feed = () => {
         console.log("Share cancelled", err);
       }
     } else {
-      // Fallback for desktop browsers that don't support native sharing
       navigator.clipboard.writeText(url);
       alert("Post link copied to clipboard!");
     }
-  };
+  }, []);
 
   // UI for logged-out users
   if (!user) {
@@ -215,14 +236,7 @@ const Feed = () => {
         Array.isArray(posts) &&
         posts.map((post) => {
           const isLiked = post.likes?.includes(user._id);
-
-          const isBookmarked =
-            Array.isArray(savedPostIds) &&
-            savedPostIds.some((bookmark) => {
-              const bookmarkId =
-                typeof bookmark === "object" ? bookmark._id : bookmark;
-              return String(bookmarkId) === String(post._id);
-            });
+          const isBookmarked = bookmarkedIds.has(String(post._id));
 
           return (
             <div
@@ -241,6 +255,7 @@ const Feed = () => {
                         src={post.author.profilePicture}
                         alt={post.author.username}
                         className="w-full h-full object-cover"
+                        loading="lazy"
                       />
                     ) : (
                       <i className="bi bi-person-fill text-moboxd-muted"></i>
@@ -258,12 +273,13 @@ const Feed = () => {
                 </span>
               </div>
 
-              {/* Image */}
+              {/* Image (Added loading lazy for performance) */}
               <Link to={`/posts/${post._id}`} className="block">
                 <img
                   src={post.imageUrl}
                   alt={post.category}
                   className="w-full h-[400px] object-cover"
+                  loading="lazy"
                 />
               </Link>
 
@@ -277,7 +293,6 @@ const Feed = () => {
                   </span>
                   <div className="flex text-moboxd-accent text-sm">
                     {[...Array(5)].map((_, i) => {
-                      // Determine if the star should be full, half, or empty
                       if (post.authorRating >= i + 1) {
                         return <i key={i} className="bi bi-star-fill"></i>;
                       } else if (post.authorRating > i) {
@@ -287,7 +302,6 @@ const Feed = () => {
                       }
                     })}
                   </div>
-                  {/* Use toFixed(1) to guarantee formats like 4.0 or 4.5 */}
                   <span className="font-bold text-white ms-1">
                     {Number(post.authorRating).toFixed(1)}
                   </span>
@@ -299,12 +313,21 @@ const Feed = () => {
                 {/* Left Side: Like & Comment */}
                 <div className="flex items-center gap-6">
                   <button
-                    onClick={() => handleLike(post._id)}
-                    className="flex items-center gap-2 group transition-colors focus:outline-none"
+                    disabled={likeLoading[post._id]}
+                    onClick={(e) => handleLike(e, post._id)}
+                    className="flex items-center gap-2 group transition-colors focus:outline-none disabled:opacity-50"
                   >
-                    <i
-                      className={`bi bi-heart${isLiked ? "-fill text-red-500" : " text-moboxd-muted group-hover:text-red-500"}`}
-                    ></i>
+                    {likeLoading[post._id] ? (
+                      <div className="w-4 h-4 border-2 border-moboxd-muted border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <i
+                        className={`bi bi-heart${
+                          isLiked
+                            ? "-fill text-red-500"
+                            : " text-moboxd-muted group-hover:text-red-500"
+                        }`}
+                      ></i>
+                    )}
                     <span
                       className={
                         isLiked
@@ -329,29 +352,31 @@ const Feed = () => {
 
                 {/* Right Side: Share & Bookmark */}
                 <div className="flex items-center gap-5">
-                  {/* Share Button */}
                   <button
-                    onClick={() => handleShare(post._id, post.author.username)}
+                    onClick={(e) => handleShare(e, post._id, post.author.username)}
                     className="group transition-colors focus:outline-none flex items-center"
                     title="Share"
                   >
                     <i className="text-lg bi bi-share text-moboxd-muted group-hover:text-white"></i>
                   </button>
 
-                  {/* Bookmark Button */}
                   <button
                     disabled={bookmarkLoading[post._id]}
-                    onClick={() => handleBookmark(post._id)}
-                    className="group transition-colors focus:outline-none flex items-center"
+                    onClick={(e) => handleBookmark(e, post._id)}
+                    className="group transition-colors focus:outline-none flex items-center disabled:opacity-50"
                     title={isBookmarked ? "Unsave" : "Save"}
                   >
-                    <i
-                      className={`text-lg bi ${
-                        isBookmarked
-                          ? "bi-bookmark-fill text-moboxd-accent"
-                          : "bi-bookmark text-moboxd-muted group-hover:text-white"
-                      }`}
-                    ></i>
+                    {bookmarkLoading[post._id] ? (
+                      <div className="w-4 h-4 border-2 border-moboxd-muted border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <i
+                        className={`text-lg bi ${
+                          isBookmarked
+                            ? "bi-bookmark-fill text-moboxd-accent"
+                            : "bi-bookmark text-moboxd-muted group-hover:text-white"
+                        }`}
+                      ></i>
+                    )}
                   </button>
                 </div>
               </div>
