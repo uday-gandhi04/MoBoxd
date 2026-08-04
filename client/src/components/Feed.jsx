@@ -174,7 +174,7 @@ const Feed = () => {
 
       {/* Posts Feed */}
       {!loading &&
-        !error &&
+        !error && Array.isArray(posts) && 
         posts.map((post) => {
           const isLiked = post.likes?.includes(user._id);
 

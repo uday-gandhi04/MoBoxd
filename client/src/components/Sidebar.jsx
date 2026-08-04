@@ -121,7 +121,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
             Categories
           </h3>
           <div className="flex flex-col gap-1">
-            {categories.length > 0 ? (
+            {Array.isArray(categories) && categories.length > 0 ? (
               categories.map((cat, index) => (
                 <Link
                   key={index}
