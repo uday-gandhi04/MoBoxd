@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from 'react';
-import { useParams,useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
 import {
@@ -31,7 +31,12 @@ const RankingArena = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // Initialize Drag-and-Drop sensors
+  // --- NEW STATE FOR TABS AND ACCORDION ---
+  const [activeTab, setActiveTab] = useState('consensus'); // 'consensus' or 'participants'
+  const [participantSubmissions, setParticipantSubmissions] = useState([]);
+  const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState(null); // Tracks which accordion is open
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -42,23 +47,19 @@ const RankingArena = () => {
   useEffect(() => {
     const fetchArenaData = async () => {
       try {
-        // 1. Fetch the lobby details
         const lobbyRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/rankings/${id}`, {
           headers: { Authorization: `Bearer ${user.token}` }
         });
         setLobby(lobbyRes.data);
         
-        // 2. Check if the user already submitted
         const subRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/rankings/${id}/my-submission`, {
           headers: { Authorization: `Bearer ${user.token}` }
         });
 
         if (subRes.data) {
-          // User already voted! Show results.
           setHasSubmitted(true);
           setConsensus(lobbyRes.data.aggregatedStats.consensus);
         } else {
-          // User hasn't voted. Setup the drag-and-drop board.
           setItems(lobbyRes.data.items);
         }
 
@@ -72,10 +73,34 @@ const RankingArena = () => {
     if (user) fetchArenaData();
   }, [id, user]);
 
-  // Handle Drag End Event
+  // --- LAZY FETCH FOR PARTICIPANTS TAB ---
+  const handleTabSwitch = async (tab) => {
+    setActiveTab(tab);
+    
+    // Only fetch if we are switching to participants and haven't fetched them yet
+    if (tab === 'participants' && participantSubmissions.length === 0) {
+      setLoadingSubmissions(true);
+      try {
+        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/rankings/${id}/submissions`, {
+          headers: { Authorization: `Bearer ${user.token}` }
+        });
+        setParticipantSubmissions(res.data);
+      } catch (error) {
+        console.error("Failed to load participant submissions", error);
+      } finally {
+        setLoadingSubmissions(false);
+      }
+    }
+  };
+
+  // Helper function to map a raw Item ID back to its string Name for the accordion
+  const getItemName = (itemId) => {
+    const foundItem = lobby?.items.find(i => i._id === itemId);
+    return foundItem ? foundItem.name : 'Unknown Item';
+  };
+
   const handleDragEnd = (event) => {
     const { active, over } = event;
-
     if (active.id !== over.id) {
       setItems((items) => {
         const oldIndex = items.findIndex(item => item._id === active.id);
@@ -86,55 +111,52 @@ const RankingArena = () => {
   };
 
   const handleShare = async () => {
-  const url = window.location.href;
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: `Join my Ranking Battle: ${lobby.title}`,
-        url: url
-      });
-    } catch (err) {
-      console.log('Share cancelled', err);
+    const url = window.location.href;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Join my Ranking Battle: ${lobby.title}`,
+          url: url
+        });
+      } catch (err) {
+        console.log('Share cancelled', err);
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      alert('Link copied to clipboard!');
     }
-  } else {
-    navigator.clipboard.writeText(url);
-    alert('Link copied to clipboard!');
-  }
-};
+  };
 
-const handleDeleteLobby = async () => {
-  if (window.confirm("Are you sure you want to delete this entire ranking battle? This cannot be undone.")) {
-    try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/api/rankings/${id}`, {
-        headers: { Authorization: `Bearer ${user.token}` }
-      });
-      navigate('/rankings');
-    } catch (error) {
-      alert("Failed to delete lobby.");
+  const handleDeleteLobby = async () => {
+    if (window.confirm("Are you sure you want to delete this entire ranking battle? This cannot be undone.")) {
+      try {
+        await axios.delete(`${import.meta.env.VITE_API_URL}/api/rankings/${id}`, {
+          headers: { Authorization: `Bearer ${user.token}` }
+        });
+        navigate('/rankings');
+      } catch (error) {
+        alert("Failed to delete lobby.");
+      }
     }
-  }
-};
+  };
 
-const handleDeleteSubmission = async () => {
-  if (window.confirm("Delete your ranking? You can always resubmit later.")) {
-    try {
-      await axios.delete(`${import.meta.env.VITE_API_URL}/api/rankings/${id}/my-submission`, {
-        headers: { Authorization: `Bearer ${user.token}` }
-      });
-      // Reset the local state to show the drag-and-drop board again
-      setHasSubmitted(false);
-      setItems(lobby.items); 
-    } catch (error) {
-      alert("Failed to delete submission.");
+  const handleDeleteSubmission = async () => {
+    if (window.confirm("Delete your ranking? You can always resubmit later.")) {
+      try {
+        await axios.delete(`${import.meta.env.VITE_API_URL}/api/rankings/${id}/my-submission`, {
+          headers: { Authorization: `Bearer ${user.token}` }
+        });
+        setHasSubmitted(false);
+        setItems(lobby.items); 
+        setActiveTab('consensus'); // Reset tab just in case
+      } catch (error) {
+        alert("Failed to delete submission.");
+      }
     }
-  }
-};
+  };
 
-  // Submit the final order to the backend
   const handleSubmitRanking = async () => {
     setSubmitting(true);
-    
-    // Format data to match our RankingSubmission schema requirement
     const rankedItems = items.map((item, index) => ({
       itemId: item._id,
       rankPosition: index + 1
@@ -146,8 +168,6 @@ const handleDeleteSubmission = async () => {
         { rankedItems },
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
-
-      // Flip the UI to the results dashboard!
       setConsensus(response.data.consensus);
       setHasSubmitted(true);
     } catch (error) {
@@ -192,8 +212,6 @@ const handleDeleteSubmission = async () => {
             >
               <i className="bi bi-share-fill"></i> Share
             </button>
-
-            {/* Show Lobby Delete only if the logged-in user is the creator */}
             {user._id === lobby.creator._id && (
               <button 
                 onClick={handleDeleteLobby}
@@ -210,37 +228,151 @@ const handleDeleteSubmission = async () => {
       {hasSubmitted ? (
         /* ================= RESULTS DASHBOARD ================= */
         <div className="bg-[#0F0F13] border border-[#2A2A35] rounded-3xl p-8">
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-              <i className="bi bi-trophy-fill text-moboxd-accent"></i> Community Consensus
-            </h2>
-            <span className="text-sm font-bold text-moboxd-muted bg-[#1A1A21] px-4 py-2 rounded-xl">
-              {lobby.aggregatedStats.participantCount} Players
-            </span>
+          
+          {/* TAB SWITCHER UI */}
+          <div className="flex bg-[#1A1A21] p-1 rounded-xl mb-8">
+            <button
+              onClick={() => handleTabSwitch('consensus')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                activeTab === 'consensus' 
+                  ? 'bg-[#2A2A35] text-white shadow' 
+                  : 'text-moboxd-muted hover:text-white'
+              }`}
+            >
+              Global Consensus
+            </button>
+            <button
+              onClick={() => handleTabSwitch('participants')}
+              className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${
+                activeTab === 'participants' 
+                  ? 'bg-[#2A2A35] text-white shadow' 
+                  : 'text-moboxd-muted hover:text-white'
+              }`}
+            >
+              Participant Lists
+            </button>
           </div>
 
-          <div className="flex flex-col gap-3">
-            {consensus.length > 0 ? (
-              consensus.map((item, index) => (
-                <div key={item.itemId} className="flex items-center gap-4 p-4 bg-[#1A1A21] rounded-xl border border-[#2A2A35]">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
-                    index === 0 ? 'bg-yellow-500 text-black' :
-                    index === 1 ? 'bg-gray-300 text-black' :
-                    index === 2 ? 'bg-amber-700 text-white' :
-                    'bg-[#2A2A35] text-moboxd-muted'
-                  }`}>
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 text-white font-bold">{item.name}</div>
-                  <div className="text-moboxd-muted text-sm font-bold">{item.totalPoints} pts</div>
+          {/* TAB 1: CONSENSUS */}
+          {activeTab === 'consensus' && (
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <i className="bi bi-trophy-fill text-moboxd-accent"></i> Final Results
+                </h2>
+                <span className="text-sm font-bold text-moboxd-muted bg-[#1A1A21] px-4 py-2 rounded-xl">
+                  {lobby.aggregatedStats.participantCount} Players
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {consensus.length > 0 ? (
+                  consensus.map((item, index) => (
+                    <div key={item.itemId} className="flex items-center gap-4 p-4 bg-[#1A1A21] rounded-xl border border-[#2A2A35]">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                        index === 0 ? 'bg-yellow-500 text-black' :
+                        index === 1 ? 'bg-gray-300 text-black' :
+                        index === 2 ? 'bg-amber-700 text-white' :
+                        'bg-[#2A2A35] text-moboxd-muted'
+                      }`}>
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 text-white font-bold">{item.name}</div>
+                      <div className="text-moboxd-muted text-sm font-bold">{item.totalPoints} pts</div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-moboxd-muted text-center py-10">Calculating results...</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: PARTICIPANTS ACCORDION */}
+          {activeTab === 'participants' && (
+            <div>
+              <h2 className="text-2xl font-bold text-white flex items-center gap-3 mb-6">
+                <i className="bi bi-people-fill text-moboxd-accent"></i> How Others Voted
+              </h2>
+              
+              {loadingSubmissions ? (
+                <div className="flex justify-center py-10">
+                  <div className="w-8 h-8 border-4 border-moboxd-accent border-t-transparent rounded-full animate-spin"></div>
                 </div>
-              ))
-            ) : (
-              <p className="text-moboxd-muted text-center py-10">Calculating results...</p>
-            )}
-          </div>
+              ) : participantSubmissions.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {participantSubmissions.map((sub) => {
+                    const isExpanded = expandedUserId === sub.userId._id;
 
-          {/* Retract Ranking Button */}
+                    return (
+                      <div key={sub._id} className="bg-[#1A1A21] rounded-xl border border-[#2A2A35] overflow-hidden transition-all duration-200">
+                        
+                        {/* Accordion Header */}
+                        <div 
+                          onClick={() => setExpandedUserId(isExpanded ? null : sub.userId._id)}
+                          className="flex items-center justify-between p-4 cursor-pointer hover:bg-[#202028] transition-colors"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-black overflow-hidden border border-[#2A2A35]">
+                              {sub.userId.profilePicture ? (
+                                <img src={sub.userId.profilePicture} alt="avatar" className="w-full h-full object-cover" />
+                              ) : (
+                                <i className="bi bi-person-fill text-moboxd-muted flex items-center justify-center h-full"></i>
+                              )}
+                            </div>
+                            <span className="text-white font-bold">@{sub.userId.username}</span>
+                          </div>
+                          
+                          <i className={`bi bi-chevron-down text-moboxd-muted transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}></i>
+                        </div>
+
+                        {/* Accordion Body (Expanded List) */}
+                        {isExpanded && (
+                          <div className="p-4 border-t border-[#2A2A35] bg-[#0F0F13]">
+                            <div className="flex flex-col gap-3">
+                              {/* Sort their items to display exactly 1 to N */}
+                              {[...sub.rankedItems]
+                                .sort((a, b) => a.rankPosition - b.rankPosition)
+                                .map((rankedItem, index) => (
+                                  <div 
+                                    key={rankedItem.itemId} 
+                                    className="flex items-center gap-4 p-4 bg-[#1A1A21] rounded-xl border border-[#2A2A35]"
+                                  >
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0 ${
+                                      index === 0 ? 'bg-yellow-500 text-black' :
+                                      index === 1 ? 'bg-gray-300 text-black' :
+                                      index === 2 ? 'bg-amber-700 text-white' :
+                                      'bg-[#2A2A35] text-moboxd-muted'
+                                    }`}>
+                                      {rankedItem.rankPosition}
+                                    </div>
+                                    <div className="flex-1 text-white font-bold">
+                                      {getItemName(rankedItem.itemId)}
+                                    </div>
+                                  </div>
+                              ))}
+                            </div>
+                            <div className="mt-4 text-right">
+                              <Link 
+                                to={`/profile/${sub.userId.username}`}
+                                className="text-sm text-moboxd-accent font-bold hover:underline"
+                              >
+                                View Profile
+                              </Link>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-moboxd-muted text-center py-10">No submissions found.</p>
+              )}
+            </div>
+          )}
+
+          {/* Retract Ranking Button (Bottom of Dashboard) */}
           <div className="mt-8 pt-6 border-t border-[#2A2A35] text-center">
             <button 
               onClick={handleDeleteSubmission}

@@ -9,6 +9,7 @@ const {
   getUserSubmission,
   deleteRankingLobby,
   deleteMySubmission,
+  getLobbySubmissions,
 } = require("../controllers/rankingController");
 
 // Global Feed (Can be public or protected, using protect here so only logged-in users see it)
@@ -25,6 +26,7 @@ router.post("/:id/submit", protect, submitRanking);
 
 // Check if the current user already ranked this lobby
 router.get("/:id/my-submission", protect, getUserSubmission);
+router.get("/:id/submissions", protect, getLobbySubmissions);
 
 router.delete("/:id", protect, deleteRankingLobby);
 router.delete("/:id/my-submission", protect, deleteMySubmission);

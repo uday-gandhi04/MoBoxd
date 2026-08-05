@@ -275,6 +275,22 @@ const getUserSubmission = async (req, res) => {
   }
 };
 
+// @desc    Get all participant submissions for a ranking lobby
+// @route   GET /api/rankings/:id/submissions
+// @access  Private (or Public, depending on your auth setup)
+const getLobbySubmissions = async (req, res) => {
+  try {
+    // Find all submissions for this ranking ID and populate the user's details
+    const submissions = await RankingSubmission.find({ rankingId: req.params.id })
+      .populate("userId", "username profilePicture displayName")
+      .sort({ createdAt: -1 }); // Newest first
+
+    res.status(200).json(submissions);
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch submissions", error: error.message });
+  }
+};
+
 module.exports = {
   createRanking,
   submitRanking,
@@ -283,4 +299,5 @@ module.exports = {
   getUserSubmission,
   deleteRankingLobby,
   deleteMySubmission,
+  getLobbySubmissions,
 };
