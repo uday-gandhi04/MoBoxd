@@ -208,29 +208,50 @@ const deleteMySubmission = async (req, res) => {
   }
 };
 
-// @desc    Get public rankings for the feed
-// @route   GET /api/rankings/feed
 // @access  Public (or Private depending on your preference)
+// @desc    Get rankings for the feed (Enforces Private visibility rules)
+// @route   GET /api/rankings/feed
 const getRankingsFeed = async (req, res) => {
   try {
     const { category } = req.query;
-    const query = { visibility: 'PUBLIC' };
-    
+    const query = {};
+
+    // 1. If a user is logged in, find all rankings they have participated in
+    if (req.user) {
+      const mySubmissions = await RankingSubmission.find({
+        userId: req.user._id,
+      }).select("rankingId");
+      const participatedRankingIds = mySubmissions.map((sub) => sub.rankingId);
+
+      // 2. Build the access rule: Public OR Creator OR Participated
+      query.$or = [
+        { visibility: "PUBLIC" },
+        { creator: req.user._id },
+        { _id: { $in: participatedRankingIds } },
+      ];
+    } else {
+      // If not logged in, they ONLY see public rankings
+      query.visibility = "PUBLIC";
+    }
+
+    // 3. Apply category filter if it exists
     if (category) {
-      query.category = new RegExp(`^${category}$`, 'i');
+      query.category = new RegExp(`^${category}$`, "i");
     }
 
     const rankings = await Ranking.find(query)
-      .populate('creator', 'username profilePicture displayName')
+      .populate("creator", "username profilePicture displayName")
       .sort({ createdAt: -1 });
 
     res.status(200).json(rankings);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch rankings feed', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch rankings feed", error: error.message });
   }
 };
 
-// @desc    Get a single ranking lobby by ID
+// @desc    Get a single ranking lobby by ID (With Privacy Protection)
 // @route   GET /api/rankings/:id
 // @access  Private
 const getRankingById = async (req, res) => {
@@ -243,6 +264,35 @@ const getRankingById = async (req, res) => {
     if (!ranking) {
       return res.status(404).json({ message: "Ranking not found" });
     }
+
+    // ================= PRIVACY CHECK =================
+    if (ranking.visibility === "PRIVATE") {
+      // 1. If no user is logged in, block access entirely
+      if (!req.user) {
+        return res
+          .status(401)
+          .json({ message: "Please log in to view this private ranking." });
+      }
+
+      // 2. Check if the logged-in user is the creator
+      const isCreator =
+        ranking.creator._id.toString() === req.user._id.toString();
+
+      // 3. Check if the logged-in user has already submitted a ranking for this lobby
+      const hasParticipated = await RankingSubmission.exists({
+        rankingId: ranking._id,
+        userId: req.user._id,
+      });
+
+      // 4. If they are neither the creator nor a participant, block access
+      if (!isCreator && !hasParticipated) {
+        return res.status(403).json({
+          message:
+            "This ranking is private. Only the creator and participants can view it.",
+        });
+      }
+    }
+    // =================================================
 
     res.status(200).json(ranking);
   } catch (error) {
@@ -281,13 +331,17 @@ const getUserSubmission = async (req, res) => {
 const getLobbySubmissions = async (req, res) => {
   try {
     // Find all submissions for this ranking ID and populate the user's details
-    const submissions = await RankingSubmission.find({ rankingId: req.params.id })
+    const submissions = await RankingSubmission.find({
+      rankingId: req.params.id,
+    })
       .populate("userId", "username profilePicture displayName")
       .sort({ createdAt: -1 }); // Newest first
 
     res.status(200).json(submissions);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch submissions", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch submissions", error: error.message });
   }
 };
 

@@ -5,7 +5,7 @@ const Post = require("../models/Post");
 const Activity = require("../models/Activity"); // IMPORT THE ACTIVITY MODEL
 const { OAuth2Client } = require("google-auth-library");
 const axios = require("axios");
-const Ranking = require('../models/Ranking');
+const Ranking = require("../models/Ranking");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -97,26 +97,52 @@ const loginUser = async (req, res) => {
 const getUserProfile = async (req, res) => {
   try {
     // Find the user by username, exclude the password field
-    const user = await User.findOne({ username: req.params.username }).select('-password');
-    
+    const user = await User.findOne({ username: req.params.username }).select(
+      "-password",
+    );
+
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Find all posts authored by this user
     const posts = await Post.find({ author: user._id })
       .sort({ createdAt: -1 })
-      .populate('author', 'username profilePicture'); 
+      .populate("author", "username profilePicture");
 
-    // Find all rankings authored by this user
-    const rankings = await Ranking.find({ creator: user._id })
+    // ------------------ Ranking Privacy ------------------
+
+    const isLoggedIn = !!req.user;
+
+    const isOwner =
+      isLoggedIn && req.user._id.toString() === user._id.toString();
+
+    const isFollower =
+      isLoggedIn &&
+      user.followers.some((id) => id.toString() === req.user._id.toString());
+
+    let rankingQuery = {
+      creator: user._id,
+    };
+
+    if (!isOwner) {
+      if (isFollower) {
+        rankingQuery.visibility = {
+          $in: ["PUBLIC", "FOLLOWERS"],
+        };
+      } else {
+        rankingQuery.visibility = "PUBLIC";
+      }
+    }
+
+    const rankings = await Ranking.find(rankingQuery)
       .sort({ createdAt: -1 })
-      .populate('creator', 'username profilePicture displayName');
+      .populate("creator", "username profilePicture displayName");
 
     // Return all three pieces of data
     res.status(200).json({ user, posts, rankings });
   } catch (error) {
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -335,18 +361,18 @@ const toggleBookmark = async (req, res) => {
     const postId = req.params.postId;
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // THE FIX: Convert both to strings before comparing!
     const isBookmarked = user.bookmarks.some(
-      (id) => id.toString() === postId.toString()
+      (id) => id.toString() === postId.toString(),
     );
 
     if (isBookmarked) {
       // Unsave: Filter it out of the array
       user.bookmarks = user.bookmarks.filter(
-        (id) => id.toString() !== postId.toString()
+        (id) => id.toString() !== postId.toString(),
       );
     } else {
       // Save: Add it to the array
@@ -354,11 +380,13 @@ const toggleBookmark = async (req, res) => {
     }
 
     await user.save();
-    
+
     // Return the updated array to the frontend
     res.status(200).json(user.bookmarks);
   } catch (error) {
-    res.status(500).json({ message: 'Failed to toggle bookmark', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to toggle bookmark", error: error.message });
   }
 };
 
@@ -368,22 +396,24 @@ const toggleBookmark = async (req, res) => {
 const getBookmarkedPosts = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).populate({
-      path: 'bookmarks',
+      path: "bookmarks",
       populate: {
-        path: 'author',
-        select: 'username profilePicture displayName'
-      }
+        path: "author",
+        select: "username profilePicture displayName",
+      },
     });
 
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     // Since we populate the bookmarks, we can just return that array
     // We reverse it so the most recently saved items appear first
     res.status(200).json(user.bookmarks.reverse());
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch bookmarks', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch bookmarks", error: error.message });
   }
 };
 
