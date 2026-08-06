@@ -7,6 +7,7 @@ const Sidebar = ({ onOpenCreateModal }) => {
   const { user, logout } = useContext(AuthContext);
   const location = useLocation();
   const [categories, setCategories] = useState([]);
+  const [hasUnreadActivity, setHasUnreadActivity] = useState(false);
 
   // Fetch dynamic categories on mount
   useEffect(() => {
@@ -22,6 +23,29 @@ const Sidebar = ({ onOpenCreateModal }) => {
     };
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    // 1. If we are currently on the activity page, force the dot off and skip the API call!
+    if (location.pathname === '/activity') {
+      setHasUnreadActivity(false);
+      return;
+    }
+
+    // 2. Otherwise, check the backend normally
+    const checkUnreadActivity = async () => {
+      if (!user) return;
+      try {
+        const { data } = await axios.get(`${import.meta.env.VITE_API_URL}/api/activity/unread`, {
+          headers: { Authorization: `Bearer ${user.token}` }
+        });
+        setHasUnreadActivity(data.hasUnread || data.count > 0);
+      } catch (error) {
+        console.error("Failed to fetch unread activity status", error);
+      }
+    };
+
+    checkUnreadActivity();
+  }, [user, location.pathname]);
 
   // Helper function to check if a link is active
   const isActive = (path) => location.pathname === path;
@@ -69,11 +93,26 @@ const Sidebar = ({ onOpenCreateModal }) => {
             <i className="bi bi-trophy text-xl"></i>
             <span className="font-bold tracking-wide">Rankings</span>
           </Link>
+
           <Link
             to="/activity"
-            className={`flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-colors ${isActive("/activity") ? "bg-moboxd-card text-moboxd-accent" : "text-moboxd-muted hover:text-white hover:bg-[#2A2A35]"}`}
+            className={`flex items-center gap-4 px-4 py-3 rounded-xl font-medium transition-colors ${
+              isActive("/activity")
+                ? "bg-moboxd-card text-moboxd-accent"
+                : "text-moboxd-muted hover:text-white hover:bg-[#2A2A35]"
+            }`}
+            onClick={() => setHasUnreadActivity(false)}
           >
-            <i className="bi bi-bell text-xl"></i>
+            {/* WRAPPER FOR ICON AND DOT */}
+            <div className="relative flex items-center justify-center">
+              <i className="bi bi-bell text-xl"></i>
+
+              {/* THE RED DOT */}
+              {hasUnreadActivity && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-[#1A1A21] animate-pulse"></span>
+              )}
+            </div>
+
             <span className="font-bold tracking-wide">Activity</span>
           </Link>
           {user && (

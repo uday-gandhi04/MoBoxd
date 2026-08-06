@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema(
   {
@@ -24,35 +24,39 @@ const userSchema = new mongoose.Schema(
     },
     profilePicture: {
       type: String,
-      default: '',
+      default: "",
     },
     // ADD THE BIO FIELD HERE:
     bio: {
       type: String,
-      default: '',
+      default: "",
       maxLength: 150, // Keeps bios short and snappy, optional but recommended!
     },
     // Add these two arrays:
     followers: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-      }
+        ref: "User",
+      },
     ],
     following: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-      }
+        ref: "User",
+      },
     ],
     bookmarks: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Post',
-      }
-    ]
+        ref: "Post",
+      },
+    ],
+    lastActivityCheck: {
+      type: Date,
+      default: Date.now, // This ensures new users don't have a blank field
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-module.exports = mongoose.model('User', userSchema);
+module.exports = mongoose.model("User", userSchema);

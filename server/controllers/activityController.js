@@ -29,4 +29,37 @@ const getActivityFeed = async (req, res) => {
   }
 };
 
-module.exports = { getActivityFeed };
+const getUnreadActivityCount = async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user._id);
+    const lastChecked = currentUser.lastActivityCheck || new Date(0);
+
+    // Count activities created after the user's last check (excluding their own actions)
+    const count = await Activity.countDocuments({
+      createdAt: { $gt: lastChecked },
+      actor: { $ne: req.user._id } 
+    });
+
+    res.status(200).json({ hasUnread: count > 0, count });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to fetch unread activity", error: error.message });
+  }
+};
+
+// @desc    Mark activity as read (Update last checked timestamp)
+// @route   PUT /api/activity/mark-read
+// @access  Private
+const markActivityAsRead = async (req, res) => {
+  try {
+    await User.findByIdAndUpdate(req.user._id, {
+      lastActivityCheck: Date.now()
+    });
+    res.status(200).json({ message: "Activity marked as read" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update activity status", error: error.message });
+  }
+};
+
+module.exports = { getActivityFeed,
+  getUnreadActivityCount, 
+  markActivityAsRead };
