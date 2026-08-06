@@ -1,5 +1,5 @@
 import { useState, useContext } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import { useGoogleLogin } from "@react-oauth/google";
@@ -12,28 +12,34 @@ const Login = () => {
 
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
         setLoading(true);
-        setError('');
-        
+        setError("");
+
         // Send the access_token directly to our backend
-        const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/users/google`, {
-           token: tokenResponse.access_token 
-        });
-        
+        const response = await axios.post(
+          `${import.meta.env.VITE_API_URL}/api/users/google`,
+          {
+            token: tokenResponse.access_token,
+          },
+        );
+
         login(response.data);
-        navigate('/');
+
+        const redirectTo = location.state?.from || "/";
+        navigate(redirectTo);
       } catch (err) {
-        setError('Google Sign-In failed. Please try again.');
+        setError("Google Sign-In failed. Please try again.");
         setLoading(false);
       }
     },
     onError: (error) => {
-      console.log('Google Auth Error:', error);
-      setError('Google Sign-In was cancelled or failed.');
+      console.log("Google Auth Error:", error);
+      setError("Google Sign-In was cancelled or failed.");
     },
   });
 
@@ -52,7 +58,8 @@ const Login = () => {
       );
 
       login(response.data);
-      navigate("/");
+      const redirectTo = location.state?.from || "/";
+      navigate(redirectTo);
     } catch (err) {
       setError(
         err.response?.data?.message ||

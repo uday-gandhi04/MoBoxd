@@ -47,14 +47,38 @@ const RankingArena = () => {
   useEffect(() => {
     const fetchArenaData = async () => {
       try {
-        const lobbyRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/rankings/${id}`, {
-          headers: { Authorization: `Bearer ${user.token}` }
-        });
+        // Public request (works for everyone)
+        const config = user
+          ? {
+              headers: {
+                Authorization: `Bearer ${user.token}`,
+              },
+            }
+          : {};
+
+        const lobbyRes = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/rankings/${id}`,
+          config
+        );
+
         setLobby(lobbyRes.data);
-        
-        const subRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/rankings/${id}/my-submission`, {
-          headers: { Authorization: `Bearer ${user.token}` }
-        });
+
+        // Guest users stop here
+        if (!user) {
+          setItems(lobbyRes.data.items);
+          setLoading(false);
+          return;
+        }
+
+        // Logged-in users continue normally
+        const subRes = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/rankings/${id}/my-submission`,
+          {
+            headers: {
+              Authorization: `Bearer ${user.token}`,
+            },
+          }
+        );
 
         if (subRes.data) {
           setHasSubmitted(true);
@@ -65,12 +89,12 @@ const RankingArena = () => {
 
         setLoading(false);
       } catch (error) {
-        console.error("Failed to load arena", error);
+        console.error(error);
         setLoading(false);
       }
     };
 
-    if (user) fetchArenaData();
+    fetchArenaData();
   }, [id, user]);
 
   // --- LAZY FETCH FOR PARTICIPANTS TAB ---
@@ -186,6 +210,112 @@ const RankingArena = () => {
   }
 
   if (!lobby) return <div className="text-center mt-20 text-white font-bold">Lobby not found.</div>;
+
+  // Guest trying to open a non-public ranking
+  if (
+    !user &&
+    lobby &&
+    (lobby.visibility === "FOLLOWERS" ||
+      lobby.visibility === "PRIVATE")
+  ) {
+    return (
+      <div className="max-w-xl mx-auto mt-20 text-center bg-[#1A1A21] border border-[#2A2A35] rounded-3xl p-10">
+        <i className="bi bi-lock-fill text-5xl text-moboxd-accent"></i>
+
+        <h2 className="text-3xl font-bold text-white mt-6">
+          Login Required
+        </h2>
+
+        <p className="text-moboxd-muted mt-4">
+          This ranking can only be accessed by logged in users.
+        </p>
+
+        <button
+          onClick={() =>
+            navigate("/login", {
+              state: { from: `/rankings/${id}` },
+            })
+          }
+          className="mt-8 bg-moboxd-accent text-black px-6 py-3 rounded-xl font-bold"
+        >
+          Login
+        </button>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-3xl mx-auto py-10 px-4">
+  
+        {/* Existing Header */}
+        <div className="mb-10 pb-8 border-b border-[#2A2A35]">
+          <span className="text-moboxd-accent text-xs font-bold uppercase tracking-widest bg-moboxd-accent/10 px-3 py-1 rounded-full mb-3 inline-block">
+            {lobby.category}
+          </span>
+  
+          <h1 className="text-4xl font-extrabold text-white mt-3">
+            {lobby.title}
+          </h1>
+  
+          {lobby.description && (
+            <p className="text-moboxd-muted mt-4">
+              {lobby.description}
+            </p>
+          )}
+        </div>
+  
+        <div className="bg-[#1A1A21] border border-[#2A2A35] rounded-3xl p-8">
+  
+          <h2 className="text-2xl text-white font-bold mb-6">
+            Ranking Items
+          </h2>
+  
+          <div className="space-y-3">
+            {items.map((item, index) => (
+              <div
+                key={item._id}
+                className="bg-[#0F0F13] border border-[#2A2A35] rounded-xl p-4 flex gap-4"
+              >
+                <div className="text-moboxd-muted font-bold">
+                  {index + 1}
+                </div>
+  
+                <div className="text-white font-semibold">
+                  {item.name}
+                </div>
+              </div>
+            ))}
+          </div>
+  
+          <div className="mt-10 border-t border-[#2A2A35] pt-8 text-center">
+  
+            <i className="bi bi-person-lock text-4xl text-moboxd-accent"></i>
+  
+            <h3 className="text-2xl font-bold text-white mt-4">
+              Want to participate?
+            </h3>
+  
+            <p className="text-moboxd-muted mt-3">
+              Log in to submit your ranking and compare it with everyone else.
+            </p>
+  
+            <button
+              onClick={() =>
+                navigate("/login", {
+                  state: { from: `/rankings/${id}` },
+                })
+              }
+              className="mt-8 bg-moboxd-accent text-black px-8 py-4 rounded-xl font-bold transition-transform active:scale-95"
+            >
+              Login to Participate
+            </button>
+  
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-3xl mx-auto py-10 px-4">

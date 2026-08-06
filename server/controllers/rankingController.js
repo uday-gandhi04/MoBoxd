@@ -265,30 +265,29 @@ const getRankingById = async (req, res) => {
       return res.status(404).json({ message: "Ranking not found" });
     }
 
+    // Public rankings can always be viewed
+    if (ranking.visibility === "PUBLIC") {
+      return res.status(200).json(ranking);
+    }
+
     // ================= PRIVACY CHECK =================
-    if (ranking.visibility === "PRIVATE") {
-      // 1. If no user is logged in, block access entirely
+    if (ranking.visibility === "FOLLOWERS") {
       if (!req.user) {
-        return res
-          .status(401)
-          .json({ message: "Please log in to view this private ranking." });
+        return res.status(401).json({
+          message: "Please login.",
+        });
       }
 
-      // 2. Check if the logged-in user is the creator
       const isCreator =
         ranking.creator._id.toString() === req.user._id.toString();
 
-      // 3. Check if the logged-in user has already submitted a ranking for this lobby
-      const hasParticipated = await RankingSubmission.exists({
-        rankingId: ranking._id,
-        userId: req.user._id,
-      });
+      const isFollower = ranking.creator.followers.some(
+        (id) => id.toString() === req.user._id.toString(),
+      );
 
-      // 4. If they are neither the creator nor a participant, block access
-      if (!isCreator && !hasParticipated) {
+      if (!isCreator && !isFollower) {
         return res.status(403).json({
-          message:
-            "This ranking is private. Only the creator and participants can view it.",
+          message: "Followers only.",
         });
       }
     }
