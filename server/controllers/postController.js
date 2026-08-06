@@ -1,8 +1,8 @@
 const Post = require("../models/Post");
 const User = require("../models/User");
 const Review = require("../models/Review");
-const Activity = require("../models/Activity"); 
-const Ranking = require("../models/Ranking"); 
+const Activity = require("../models/Activity");
+const Ranking = require("../models/Ranking");
 
 // @desc    Get all posts for the home feed
 // @route   GET /api/posts
@@ -10,8 +10,28 @@ const Ranking = require("../models/Ranking");
 const getFeedPosts = async (req, res) => {
   try {
     const { category } = req.query;
-    // If a category is provided, use a case-insensitive regex search. Otherwise, fetch all.
-    const query = category ? { category: new RegExp(`^${category}$`, 'i') } : {};
+    const query = {};
+
+    if (req.user) {
+      const currentUser = await User.findById(req.user._id);
+
+      query.$or = [
+        { visibility: "PUBLIC" },
+
+        { author: req.user._id },
+
+        {
+          visibility: "FOLLOWERS",
+          author: { $in: currentUser.following },
+        },
+      ];
+    } else {
+      query.visibility = "PUBLIC";
+    }
+
+    if (category) {
+      query.category = new RegExp(`^${category}$`, "i");
+    }
 
     const posts = await Post.find(query)
       .populate("author", "username profilePicture")
@@ -19,7 +39,10 @@ const getFeedPosts = async (req, res) => {
 
     res.status(200).json(posts);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch posts", error: error.message });
+    res.status(500).json({
+      message: "Failed to fetch posts",
+      error: error.message,
+    });
   }
 };
 
@@ -36,7 +59,8 @@ const createPost = async (req, res) => {
       imageUrl: req.file.path,
       caption,
       category,
-      authorRating: Number(authorRating), 
+      visibility,
+      authorRating: Number(authorRating),
       communityAverageRating: 0,
       totalReviews: 0,
     });
@@ -59,23 +83,65 @@ const getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id).populate(
       "author",
-      "username profilePicture",
+      "username profilePicture followers",
     );
 
     if (!post) {
       return res.status(404).json({ message: "Post not found" });
     }
 
+    // ================= PUBLIC =================
+
+    if (post.visibility === "PUBLIC") {
+      // Everyone can view
+    }
+
+    // ================= FOLLOWERS =================
+    else if (post.visibility === "FOLLOWERS") {
+      if (!req.user) {
+        return res.status(401).json({
+          message: "Please login.",
+        });
+      }
+
+      const isCreator = post.author._id.toString() === req.user._id.toString();
+
+      const isFollower = post.author.followers.some(
+        (id) => id.toString() === req.user._id.toString(),
+      );
+
+      if (!isCreator && !isFollower) {
+        return res.status(403).json({
+          message: "Followers only.",
+        });
+      }
+    }
+
+    // ================= PRIVATE =================
+    else if (post.visibility === "PRIVATE") {
+      if (!req.user) {
+        return res.status(401).json({
+          message: "Please login.",
+        });
+      }
+
+      // Logged in users with the link may view.
+      // Creator is obviously also allowed.
+    }
+
     const reviews = await Review.find({ post: post._id })
       .populate("user", "username profilePicture")
-      .sort({ createdAt: -1 }); 
+      .sort({ createdAt: -1 });
 
     const postObject = post.toObject();
     postObject.reviews = reviews;
 
     res.status(200).json(postObject);
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({
+      message: "Server error",
+      error: error.message,
+    });
   }
 };
 
@@ -124,8 +190,8 @@ const addReview = async (req, res) => {
     // 2. ACTIVITY TRIGGER: Log the review
     await Activity.create({
       actor: req.user._id,
-      actionType: 'REVIEW',
-      post: postId
+      actionType: "REVIEW",
+      post: postId,
     });
 
     const updatedPost = await Post.findById(postId).populate(
@@ -193,22 +259,21 @@ const toggleLike = async (req, res) => {
       post.likes = post.likes.filter(
         (userId) => userId.toString() !== req.user.id,
       );
-      
+
       // 4. ACTIVITY TRIGGER: Remove the like activity from the feed if they unlike it
       await Activity.findOneAndDelete({
         actor: req.user.id,
-        actionType: 'LIKE',
-        post: req.params.id
+        actionType: "LIKE",
+        post: req.params.id,
       });
-
     } else {
       post.likes.push(req.user.id);
-      
+
       // 5. ACTIVITY TRIGGER: Log the like activity
       await Activity.create({
         actor: req.user.id,
-        actionType: 'LIKE',
-        post: req.params.id
+        actionType: "LIKE",
+        post: req.params.id,
       });
     }
 
@@ -224,7 +289,7 @@ const toggleLike = async (req, res) => {
 
 const updatePost = async (req, res) => {
   try {
-    const { caption, category, authorRating } = req.body;
+    const { caption, category, authorRating, visibility } = req.body;
     const post = await Post.findById(req.params.id);
 
     if (!post) {
@@ -239,6 +304,9 @@ const updatePost = async (req, res) => {
 
     post.caption = caption || post.caption;
     post.category = category || post.category;
+    if (visibility) {
+      post.visibility = visibility;
+    }
     if (authorRating) post.authorRating = Number(authorRating);
 
     const updatedPost = await post.save();
@@ -257,9 +325,14 @@ const getPersonalFeed = async (req, res) => {
   try {
     const currentUser = await User.findById(req.user.id);
 
-    const posts = await Post.find({ author: { $in: currentUser.following } })
+    const posts = await Post.find({
+      author: { $in: currentUser.following },
+      visibility: {
+        $in: ["PUBLIC", "FOLLOWERS"],
+      },
+    })
       .populate("author", "username profilePicture")
-      .sort({ createdAt: -1 }); 
+      .sort({ createdAt: -1 });
 
     res.status(200).json(posts);
   } catch (error) {
@@ -270,20 +343,23 @@ const getPersonalFeed = async (req, res) => {
 };
 const getCategories = async (req, res) => {
   try {
-    const postCategories = await Post.distinct('category');
-    const rankingCategories = await Ranking.distinct('category');
-    
+    const postCategories = await Post.distinct("category");
+    const rankingCategories = await Ranking.distinct("category");
+
     // Combine, deduplicate, and remove any empty/null categories
-    const allCategories = [...new Set([...postCategories, ...rankingCategories])]
+    const allCategories = [
+      ...new Set([...postCategories, ...rankingCategories]),
+    ]
       .filter(Boolean)
       .sort(); // Alphabetical order
 
     res.status(200).json(allCategories);
   } catch (error) {
-    res.status(500).json({ message: "Failed to fetch categories", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to fetch categories", error: error.message });
   }
 };
-
 
 module.exports = {
   getFeedPosts,

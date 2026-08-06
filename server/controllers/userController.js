@@ -106,12 +106,6 @@ const getUserProfile = async (req, res) => {
     }
 
     // Find all posts authored by this user
-    const posts = await Post.find({ author: user._id })
-      .sort({ createdAt: -1 })
-      .populate("author", "username profilePicture");
-
-    // ------------------ Ranking Privacy ------------------
-
     const isLoggedIn = !!req.user;
 
     const isOwner =
@@ -120,6 +114,35 @@ const getUserProfile = async (req, res) => {
     const isFollower =
       isLoggedIn &&
       user.followers.some((id) => id.toString() === req.user._id.toString());
+
+    let postQuery = {
+      author: user._id,
+    };
+
+    if (!isOwner) {
+      if (isFollower) {
+        postQuery.visibility = {
+          $in: ["PUBLIC", "FOLLOWERS"],
+        };
+      } else {
+        postQuery.visibility = "PUBLIC";
+      }
+    }
+
+    const posts = await Post.find(postQuery)
+      .sort({ createdAt: -1 })
+      .populate("author", "username profilePicture");
+
+    // ------------------ Ranking Privacy ------------------
+
+    // const isLoggedIn = !!req.user;
+
+    // const isOwner =
+    //   isLoggedIn && req.user._id.toString() === user._id.toString();
+
+    // const isFollower =
+    //   isLoggedIn &&
+    //   user.followers.some((id) => id.toString() === req.user._id.toString());
 
     let rankingQuery = {
       creator: user._id,
