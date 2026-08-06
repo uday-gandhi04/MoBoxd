@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
@@ -10,7 +10,11 @@ const Explore = () => {
   const [loading, setLoading] = useState(false);
   const [postsLoading, setPostsLoading] = useState(true);
   
-  const { user } = useContext(AuthContext);
+  // Added bookmarkLoading state to track individual post loading states
+  const [bookmarkLoading, setBookmarkLoading] = useState({});
+  
+  // Added setUser to update the context optimistically
+  const { user, setUser } = useContext(AuthContext);
 
   // Fetch Global Posts
   useEffect(() => {
@@ -52,6 +56,14 @@ const Explore = () => {
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
+  // Memoize bookmarks into an O(1) Set lookup
+  const bookmarkedIds = useMemo(() => {
+    const ids = user?.bookmarks?.map((id) =>
+      String(typeof id === "object" ? id._id : id)
+    ) || [];
+    return new Set(ids);
+  }, [user?.bookmarks]);
+
   const handleLike = async (postId) => {
     if (!user) return alert('Please log in to like moments.');
 
@@ -70,8 +82,73 @@ const Explore = () => {
     }
   };
 
+  // Optimistic Bookmark Functionality
+  const handleBookmark = useCallback(async (e, postId) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) return alert("Please log in to save moments.");
+    if (bookmarkLoading[postId]) return;
+
+    setBookmarkLoading((prev) => ({ ...prev, [postId]: true }));
+
+    const oldBookmarks = user.bookmarks || [];
+    const isBookmarked = bookmarkedIds.has(String(postId));
+
+    const updatedBookmarks = isBookmarked
+      ? oldBookmarks.filter((id) => {
+          const bId = typeof id === "object" ? id._id : id;
+          return String(bId) !== String(postId);
+        })
+      : [...oldBookmarks, postId];
+
+    if (typeof setUser === "function") {
+      setUser((prev) => ({ ...prev, bookmarks: updatedBookmarks }));
+    }
+
+    try {
+      const res = await axios.put(
+        `${import.meta.env.VITE_API_URL}/api/users/bookmarks/${postId}`,
+        {},
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      );
+
+      if (typeof setUser === "function") {
+        setUser((prev) => ({ ...prev, bookmarks: res.data || [] }));
+      }
+    } catch (err) {
+      console.error("Error toggling bookmark:", err);
+      if (typeof setUser === "function") {
+        setUser((prev) => ({ ...prev, bookmarks: oldBookmarks }));
+      }
+    } finally {
+      setBookmarkLoading((prev) => ({ ...prev, [postId]: false }));
+    }
+  }, [user, bookmarkedIds, bookmarkLoading, setUser]);
+
+  // Memoized Share Handler
+  const handleShare = useCallback(async (e, postId, authorName) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const url = `${window.location.origin}/posts/${postId}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `Check out this moment by @${authorName} on MoBoxd`,
+          url: url,
+        });
+      } catch (err) {
+        console.log("Share cancelled", err);
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      alert("Post link copied to clipboard!");
+    }
+  }, []);
+
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4">
+    <div className="max-w-[470px] mx-auto py-8 px-4">
       
       {/* Search Bar */}
       <div className="bg-[#1A1A21] border border-[#2A2A35] rounded-2xl p-4 flex items-center mb-8 shadow-sm transition-colors focus-within:border-moboxd-accent">
@@ -138,6 +215,7 @@ const Explore = () => {
           ) : (
             globalPosts.map((post) => {
               const isLiked = user && post.likes?.includes(user._id);
+              const isBookmarked = bookmarkedIds.has(String(post._id));
 
               return (
                 <div key={post._id} className="bg-moboxd-card rounded-2xl overflow-hidden mb-8 border border-[#2A2A35] shadow-lg">
@@ -162,7 +240,7 @@ const Explore = () => {
 
                   {/* Image */}
                   <Link to={`/posts/${post._id}`} className="block">
-                    <img src={post.imageUrl} alt={post.category} className="w-full h-[400px] object-cover" />
+                    <img src={post.imageUrl} alt={post.category} className="w-full aspect-[4/5] object-cover" loading="lazy" />
                   </Link>
 
                   {/* Card Body */}
@@ -184,19 +262,52 @@ const Explore = () => {
                     </div>
                   </div>
 
-                  {/* Card Footer */}
-                  <div className="px-4 py-3 border-t border-[#2A2A35] flex items-center gap-6">
-                    <button onClick={() => handleLike(post._id)} className="flex items-center gap-2 group transition-colors focus:outline-none cursor-pointer">
-                      <i className={`bi bi-heart${isLiked ? '-fill text-red-500' : ' text-moboxd-muted group-hover:text-red-500'}`}></i>
-                      <span className={isLiked ? 'text-white font-medium' : 'text-moboxd-muted group-hover:text-white font-medium'}>
-                        {post.likes?.length || 0}
-                      </span>
-                    </button>
+                  {/* Card Footer updated to match Feed.jsx structure */}
+                  <div className="px-4 py-3 border-t border-[#2A2A35] flex items-center justify-between">
+                    {/* Left Side: Like & Comment */}
+                    <div className="flex items-center gap-6">
+                      <button onClick={() => handleLike(post._id)} className="flex items-center gap-2 group transition-colors focus:outline-none cursor-pointer">
+                        <i className={`bi bi-heart${isLiked ? '-fill text-red-500' : ' text-moboxd-muted group-hover:text-red-500'}`}></i>
+                        <span className={isLiked ? 'text-white font-medium' : 'text-moboxd-muted group-hover:text-white font-medium'}>
+                          {post.likes?.length || 0}
+                        </span>
+                      </button>
 
-                    <Link to={`/posts/${post._id}`} className="flex items-center gap-2 group transition-colors">
-                      <i className="bi bi-chat text-moboxd-muted group-hover:text-white"></i>
-                      <span className="text-moboxd-muted group-hover:text-white font-medium">{post.totalReviews}</span>
-                    </Link>
+                      <Link to={`/posts/${post._id}`} className="flex items-center gap-2 group transition-colors">
+                        <i className="bi bi-chat text-moboxd-muted group-hover:text-white"></i>
+                        <span className="text-moboxd-muted group-hover:text-white font-medium">{post.totalReviews}</span>
+                      </Link>
+                    </div>
+
+                    {/* Right Side: Share & Bookmark */}
+                    <div className="flex items-center gap-5">
+                      <button
+                        onClick={(e) => handleShare(e, post._id, post.author.username)}
+                        className="group transition-colors focus:outline-none flex items-center"
+                        title="Share"
+                      >
+                        <i className="text-lg bi bi-share text-moboxd-muted group-hover:text-white"></i>
+                      </button>
+
+                      <button
+                        disabled={bookmarkLoading[post._id]}
+                        onClick={(e) => handleBookmark(e, post._id)}
+                        className="group transition-colors focus:outline-none flex items-center disabled:opacity-50"
+                        title={isBookmarked ? "Unsave" : "Save"}
+                      >
+                        {bookmarkLoading[post._id] ? (
+                          <div className="w-4 h-4 border-2 border-moboxd-muted border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <i
+                            className={`text-lg bi ${
+                              isBookmarked
+                                ? "bi-bookmark-fill text-moboxd-accent"
+                                : "bi-bookmark text-moboxd-muted group-hover:text-white"
+                            }`}
+                          ></i>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );

@@ -163,7 +163,7 @@ const PostDetail = () => {
         {/* Image (Only renders if imageUrl exists) */}
         {post?.imageUrl && (
           <div className="w-full bg-black">
-            <img src={post.imageUrl} alt={post.category || 'Moment'} className="w-full max-h-[600px] object-contain" />
+            <img src={post.imageUrl} alt={post.category || 'Moment'} className="w-full aspect-[4/5] object-cover" />
           </div>
         )}
 

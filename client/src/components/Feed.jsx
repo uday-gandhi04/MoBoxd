@@ -194,7 +194,7 @@ const Feed = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4">
+    <div className="max-w-[470px] mx-auto py-8 px-4">
       <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#2A2A35]">
         <h1 className="text-2xl font-bold text-white tracking-wide">
           Your Feed
@@ -278,7 +278,7 @@ const Feed = () => {
                 <img
                   src={post.imageUrl}
                   alt={post.category}
-                  className="w-full h-[400px] object-cover"
+                  className="w-full aspect-[4/5] object-cover"
                   loading="lazy"
                 />
               </Link>

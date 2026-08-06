@@ -1,16 +1,21 @@
 import { useState, useContext } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 
 const MobileHeader = () => {
-  const { user, dispatch } = useContext(AuthContext); // Assuming you use dispatch to logout, or adjust to your logout function
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { user, dispatch } = useContext(AuthContext); 
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  
+  const location = useLocation();
   const navigate = useNavigate();
+
+  // Check if the user is viewing their OWN profile
+  const isMyProfile = user && location.pathname === `/profile/${user.username}`;
 
   const handleLogout = () => {
     if (dispatch) dispatch({ type: "LOGOUT" });
     localStorage.removeItem("user");
-    setIsMenuOpen(false);
+    setIsSettingsOpen(false);
     navigate("/login");
   };
 
@@ -23,38 +28,46 @@ const MobileHeader = () => {
           <span className="text-xl font-bold text-white tracking-wide">MoBoxd</span>
         </Link>
 
+        {/* Contextual Top-Right Button */}
         {user && (
-          <button 
-            onClick={() => setIsMenuOpen(!isMenuOpen)} 
-            className="text-white focus:outline-none text-2xl"
-          >
-            <i className={`bi ${isMenuOpen ? 'bi-x-lg' : 'bi-list'}`}></i>
-          </button>
+          isMyProfile ? (
+            // Show GEAR icon if on own profile
+            <button 
+              onClick={() => setIsSettingsOpen(!isSettingsOpen)} 
+              className={`text-white hover:text-moboxd-accent transition-colors flex items-center text-2xl ${isSettingsOpen ? 'text-moboxd-accent' : ''}`}
+            >
+              <i className="bi bi-gear-fill"></i>
+            </button>
+          ) : (
+            // Show BELL icon everywhere else
+            <Link 
+              to="/activity" 
+              className="text-white hover:text-moboxd-accent transition-colors flex items-center text-2xl"
+            >
+              <i className="bi bi-bell-fill"></i>
+            </Link>
+          )
         )}
       </header>
 
-      {/* Hamburger Dropdown Menu */}
-      {user && isMenuOpen && (
-        <div className="md:hidden fixed top-16 left-0 w-full h-[calc(100vh-4rem)] bg-black/80 backdrop-blur-md z-40">
-          <div className="bg-[#1A1A21] border-b border-[#2A2A35] flex flex-col px-4 py-6 shadow-2xl">
-            <Link to="/create-ranking" onClick={() => setIsMenuOpen(false)} className="py-3 text-lg font-bold text-white flex items-center gap-4">
-              <i className="bi bi-list-ol text-moboxd-muted"></i> New Ranking
-            </Link>
-            <Link to="/rankings" onClick={() => setIsMenuOpen(false)} className="py-3 text-lg font-bold text-white flex items-center gap-4">
-              <i className="bi bi-trophy text-moboxd-muted"></i> Rankings
-            </Link>
-            <Link to="/activity" onClick={() => setIsMenuOpen(false)} className="py-3 text-lg font-bold text-white flex items-center gap-4">
-              <i className="bi bi-bell text-moboxd-muted"></i> Activity
-            </Link>
-            <Link to={`/profile/${user.username}?tab=saved`} onClick={() => setIsMenuOpen(false)} className="py-3 text-lg font-bold text-white flex items-center gap-4 border-b border-[#2A2A35] mb-2 pb-5">
-              <i className="bi bi-bookmark text-moboxd-muted"></i> Bookmarks
-            </Link>
-            
-            <button onClick={handleLogout} className="py-3 text-lg font-bold text-red-500 flex items-center gap-4 text-left">
-              <i className="bi bi-box-arrow-right"></i> Log Out
+      {/* Settings Dropdown Menu (Only visible when Gear is clicked) */}
+      {isSettingsOpen && isMyProfile && (
+        <>
+          {/* Invisible overlay to close menu when clicking outside */}
+          <div 
+            className="fixed inset-0 z-30" 
+            onClick={() => setIsSettingsOpen(false)}
+          ></div>
+          
+          <div className="md:hidden fixed top-16 right-0 w-full sm:w-64 bg-[#1A1A21] border-b sm:border border-[#2A2A35] shadow-2xl z-40 flex flex-col py-2 px-4 sm:mr-4 sm:mt-2 sm:rounded-xl">
+            <button 
+              onClick={handleLogout} 
+              className="py-3 text-base font-bold text-red-500 hover:bg-red-500/10 rounded-lg flex items-center gap-3 w-full text-left transition-colors px-2"
+            >
+              <i className="bi bi-box-arrow-right text-xl"></i> Log Out
             </button>
           </div>
-        </div>
+        </>
       )}
     </>
   );
