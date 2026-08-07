@@ -48,7 +48,7 @@ const getFeedPosts = async (req, res) => {
 
 const createPost = async (req, res) => {
   try {
-    const { caption, category, authorRating } = req.body;
+    const { caption, category, authorRating, visibility } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ message: "An image is required" });
