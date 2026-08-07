@@ -67,6 +67,22 @@ const Activity = () => {
       }));
     }
   };
+  
+  useEffect(() => {
+    const markAsRead = async () => {
+      try {
+        await axios.put(`${import.meta.env.VITE_API_URL}/api/activity/mark-read`, {}, {
+          headers: { Authorization: `Bearer ${user.token}` }
+        });
+      } catch (error) {
+        console.error("Failed to mark activity as read", error);
+      }
+    };
+
+    if (user) {
+      markAsRead();
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchActivity = async () => {

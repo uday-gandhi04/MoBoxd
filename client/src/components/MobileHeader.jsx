@@ -4,7 +4,7 @@ import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 
 const MobileHeader = () => {
-  const { user, dispatch } = useContext(AuthContext);
+  const { user, setUser } = useContext(AuthContext);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [hasUnreadActivity, setHasUnreadActivity] = useState(false);
   const hideOnRoutes = ["/login", "/signup"];
