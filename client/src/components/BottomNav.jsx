@@ -5,10 +5,15 @@ import { AuthContext } from "../context/AuthContext";
 const BottomNav = ({ onOpenCreateModal }) => {
   const { user } = useContext(AuthContext);
   const location = useLocation();
+  const hideOnRoutes = ["/login", "/signup"];
 
   if (!user) return null;
 
   const isActive = (path) => location.pathname === path;
+
+  if (hideOnRoutes.includes(location.pathname)) {
+    return null;
+  }
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 w-full bg-[#1A1A21] border-t border-[#2A2A35] flex justify-between items-center h-16 z-50 px-4 pb-safe">
