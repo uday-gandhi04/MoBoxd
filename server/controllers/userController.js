@@ -6,6 +6,7 @@ const Activity = require("../models/Activity"); // IMPORT THE ACTIVITY MODEL
 const { OAuth2Client } = require("google-auth-library");
 const axios = require("axios");
 const Ranking = require("../models/Ranking");
+const { sendPushNotification } = require("../utils/pushNotification");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -236,6 +237,14 @@ const toggleFollow = async (req, res) => {
         actionType: "FOLLOW",
         targetUser: targetUserId,
       });
+
+      // --- ADD NOTIFICATION HERE ---
+      sendPushNotification(targetUserId, {
+        title: "New Follower!",
+        body: `${currentUser.username} started following you.`,
+        url: `/profile/${currentUser.username}`, 
+      });
+      
     }
 
     await currentUser.save();

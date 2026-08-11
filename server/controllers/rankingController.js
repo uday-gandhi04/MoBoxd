@@ -1,6 +1,7 @@
 const Ranking = require("../models/Ranking");
 const RankingSubmission = require("../models/RankingSubmission");
 const Activity = require("../models/Activity");
+const { sendPushNotification } = require("../utils/pushNotification");
 
 // @desc    Create a new ranking lobby
 // @route   POST /api/rankings
@@ -29,6 +30,23 @@ const createRanking = async (req, res) => {
       actionType: "CREATE_RANKING",
       ranking: ranking._id,
     });
+
+    // --- ADD NOTIFICATION HERE ---
+    if (visibility === "PUBLIC" || visibility === "FOLLOWERS") {
+      const creator = await User.findById(req.user._id);
+      
+      // Send a push to every user in the creator's followers array
+      if (creator.followers && creator.followers.length > 0) {
+        creator.followers.forEach((followerId) => {
+          sendPushNotification(followerId, {
+            title: "New Ranking Lobby!",
+            body: `${creator.username} created a new ranking: ${title}`,
+            url: `/rankings/${ranking._id}`,
+          });
+        });
+      }
+    }
+    // -----------------------------
 
     res.status(201).json(ranking);
   } catch (error) {
@@ -80,6 +98,16 @@ const submitRanking = async (req, res) => {
         actionType: "SUBMIT_RANKING",
         ranking: rankingId,
       });
+      
+      // --- ADD NOTIFICATION HERE ---
+      if (ranking.creator.toString() !== req.user._id.toString()) {
+        const actingUser = await User.findById(req.user._id);
+        sendPushNotification(ranking.creator, {
+          title: "New Ranking Submission!",
+          body: `${actingUser.username} submitted their rankings for your lobby.`,
+          url: `/rankings/${ranking._id}`,
+        });
+      }
     }
 
     const allSubmissions = await RankingSubmission.find({ rankingId });

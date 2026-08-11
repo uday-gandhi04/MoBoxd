@@ -8,6 +8,9 @@ const MobileHeader = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [hasUnreadActivity, setHasUnreadActivity] = useState(false);
   const hideOnRoutes = ["/login", "/signup"];
+  const [notificationsEnabled, setNotificationsEnabled] = useState(
+    "Notification" in window && Notification.permission === "granted"
+  );
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -48,6 +51,22 @@ const MobileHeader = () => {
     localStorage.removeItem("user"); // This clears the browser memory
     setIsSettingsOpen(false);
     navigate("/login");
+  };
+
+  
+
+  const handleToggleNotifications = async () => {
+    if (notificationsEnabled) {
+      // Browsers do not let websites programmatically "revoke" permission easily.
+      // If they want to turn it off, they have to do it in browser settings.
+      alert("To disable notifications, please click the lock icon in your browser URL bar and block notifications.");
+    } else {
+      // Trigger the prompt (not silent, so they get the success alert)
+      const success = await subscribeToPushNotifications(user.token, false);
+      if (success) {
+        setNotificationsEnabled(true);
+      }
+    }
   };
 
   // If the current URL matches one of those routes, return null (render nothing)
@@ -99,6 +118,24 @@ const MobileHeader = () => {
           ></div>
 
           <div className="md:hidden fixed top-16 right-0 w-full sm:w-64 bg-[#1A1A21] border-b sm:border border-[#2A2A35] shadow-2xl z-40 flex flex-col py-2 px-4 sm:mr-4 sm:mt-2 sm:rounded-xl">
+            
+            {/* Notifications Toggle Button */}
+            <button
+              onClick={handleToggleNotifications}
+              className="py-3 text-base font-bold text-white hover:bg-[#2A2A35] rounded-lg flex items-center justify-between gap-3 w-full text-left transition-colors px-2 border-b border-[#2A2A35] mb-1"
+            >
+              <div className="flex items-center gap-3">
+                <i className={`bi ${notificationsEnabled ? 'bi-bell-fill text-moboxd-accent' : 'bi-bell-slash text-moboxd-muted'} text-xl`}></i> 
+                Notifications
+              </div>
+              
+              {/* Fake Toggle Switch UI */}
+              <div className={`w-10 h-5 rounded-full relative transition-colors ${notificationsEnabled ? 'bg-moboxd-accent' : 'bg-gray-600'}`}>
+                <div className={`w-4 h-4 bg-black rounded-full absolute top-0.5 transition-all ${notificationsEnabled ? 'right-0.5' : 'left-0.5'}`}></div>
+              </div>
+            </button>
+            
+            {/*logout button*/}
             <button
               onClick={handleLogout}
               className="py-3 text-base font-bold text-red-500 hover:bg-red-500/10 rounded-lg flex items-center gap-3 w-full text-left transition-colors px-2"

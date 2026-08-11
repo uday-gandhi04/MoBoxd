@@ -6,6 +6,7 @@ const {
   createPost,
   getPostById,
   addReview,
+  deleteReview,
   deletePost,
   toggleLike,
   updatePost,
@@ -41,6 +42,8 @@ router.route("/:id/like")
 // Review routes (/api/posts/:id/reviews)
 router.route("/:id/reviews")
   .post(protect, addReview);
+
+router.delete("/:id/reviews/:reviewId", protect, deleteReview);
 
 
 

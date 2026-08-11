@@ -102,6 +102,30 @@ const PostDetail = () => {
     }
   };
 
+  const handleDeleteReview = async (reviewId) => {
+    if (!window.confirm("Are you sure you want to delete this review?")) return;
+
+    try {
+      const response = await axios.delete(
+        `${import.meta.env.VITE_API_URL}/api/posts/${id}/reviews/${reviewId}`,
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      );
+
+      // Instantly update the UI: remove the review and apply the new math
+      setPost((prev) => {
+        const updatedReviews = prev.reviews.filter((r) => r._id !== reviewId);
+        return {
+          ...prev,
+          reviews: updatedReviews,
+          communityAverageRating: response.data.communityAverageRating,
+          totalReviews: response.data.totalReviews,
+        };
+      });
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete review");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center mt-20">
@@ -288,6 +312,7 @@ const PostDetail = () => {
         )}
 
         {/* Reviews List */}
+        {/* Reviews List */}
         <div className="flex flex-col gap-4">
           {(!post?.reviews || post.reviews.length === 0) ? (
             <div className="text-center text-moboxd-muted py-8">No reviews yet. Be the first!</div>
@@ -296,8 +321,11 @@ const PostDetail = () => {
               // Failsafe in case a review is somehow deleted or malformed in the DB
               if (!review || !review._id) return null;
               
+              // CHECK OWNERSHIP: Does the logged-in user's ID match the review author's ID?
+              const isReviewOwner = user && review?.user?._id === user._id;
+              
               return (
-                <div key={review._id} className="bg-moboxd-card border border-[#2A2A35] rounded-xl p-5 flex gap-4">
+                <div key={review._id} className="bg-moboxd-card border border-[#2A2A35] rounded-xl p-5 flex gap-4 relative group">
                   <Link to={`/profile/${review?.user?.username || 'unknown'}`} className="w-10 h-10 rounded-full bg-[#2A2A35] flex items-center justify-center overflow-hidden shrink-0 mt-1">
                     {review?.user?.profilePicture ? (
                       <img src={review.user.profilePicture} alt={review.user.username} className="w-full h-full object-cover" />
@@ -307,18 +335,31 @@ const PostDetail = () => {
                   </Link>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-2">
-                      <Link to={`/profile/${review?.user?.username || 'unknown'}`} className="font-bold text-white hover:text-moboxd-accent transition-colors">
-                        {review?.user?.username || 'Unknown User'}
-                      </Link>
-                      <div className="flex text-moboxd-accent text-sm">
-                        {[...Array(5)].map((_, i) => {
-                          let iconClass = "bi-star";
-                          const rating = review?.rating || 0;
-                          if (rating >= i + 1) iconClass = "bi-star-fill";
-                          else if (rating === i + 0.5) iconClass = "bi-star-half";
-                          return <i key={i} className={`bi ${iconClass}`}></i>;
-                        })}
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                        <Link to={`/profile/${review?.user?.username || 'unknown'}`} className="font-bold text-white hover:text-moboxd-accent transition-colors">
+                          {review?.user?.username || 'Unknown User'}
+                        </Link>
+                        <div className="flex text-moboxd-accent text-sm">
+                          {[...Array(5)].map((_, i) => {
+                            let iconClass = "bi-star";
+                            const rating = review?.rating || 0;
+                            if (rating >= i + 1) iconClass = "bi-star-fill";
+                            else if (rating === i + 0.5) iconClass = "bi-star-half";
+                            return <i key={i} className={`bi ${iconClass}`}></i>;
+                          })}
+                        </div>
                       </div>
+
+                      {/* RENDER DELETE BUTTON ONLY IF IT'S THEIR REVIEW */}
+                      {isReviewOwner && (
+                        <button 
+                          onClick={() => handleDeleteReview(review._id)} 
+                          className="text-moboxd-muted hover:text-red-500 transition-colors cursor-pointer border-0 bg-transparent p-1"
+                          title="Delete Review"
+                        >
+                          <i className="bi bi-trash3-fill"></i>
+                        </button>
+                      )}
                     </div>
                     <p className="text-gray-300 text-sm leading-relaxed">{review?.comment}</p>
                   </div>

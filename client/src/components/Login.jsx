@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import { useGoogleLogin } from "@react-oauth/google";
+import { subscribeToPushNotifications } from "../utils/pushHelper";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -29,6 +30,10 @@ const Login = () => {
         );
 
         login(response.data);
+
+        if ("Notification" in window && Notification.permission === "default") {
+          subscribeToPushNotifications(response.data.token, true);
+        }
 
         const redirectTo = location.state?.from || "/";
         navigate(redirectTo);
@@ -58,6 +63,11 @@ const Login = () => {
       );
 
       login(response.data);
+
+      if ("Notification" in window && Notification.permission === "default") {
+        subscribeToPushNotifications(response.data.token, true);
+      }
+
       const redirectTo = location.state?.from || "/";
       navigate(redirectTo);
     } catch (err) {

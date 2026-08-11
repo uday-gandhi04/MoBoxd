@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
       trim: true,
-      lowercase: true
+      lowercase: true,
     },
     password: {
       type: String,
@@ -56,6 +56,17 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now, // This ensures new users don't have a blank field
     },
+
+    pushSubscriptions: [
+      {
+        endpoint: String,
+        expirationTime: Date,
+        keys: {
+          p256dh: String,
+          auth: String,
+        },
+      },
+    ],
   },
   { timestamps: true },
 );

@@ -3,6 +3,7 @@ const User = require("../models/User");
 const Review = require("../models/Review");
 const Activity = require("../models/Activity");
 const Ranking = require("../models/Ranking");
+const { sendPushNotification } = require("../utils/pushNotification");
 
 // @desc    Get all posts for the home feed
 // @route   GET /api/posts
@@ -194,6 +195,16 @@ const addReview = async (req, res) => {
       post: postId,
     });
 
+    // --- ADD NOTIFICATION HERE ---
+    if (post.author.toString() !== req.user._id.toString()) {
+      sendPushNotification(post.author, {
+        title: "New Review!",
+        body: `${req.user.username} left a ${rating}-star review on your moment.`,
+        url: `/posts/${post._id}`,
+      });
+    }
+    // -----------------------------
+
     const updatedPost = await Post.findById(postId).populate(
       "author",
       "username profilePicture",
@@ -211,6 +222,67 @@ const addReview = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to add review", error: error.message });
+  }
+};
+
+// @desc    Delete a review
+// @route   DELETE /api/posts/:id/reviews/:reviewId
+// @access  Private
+const deleteReview = async (req, res) => {
+  try {
+    // --- THE FIX: Extract 'id' to match your route definitions ---
+    const postId = req.params.id; 
+    const reviewId = req.params.reviewId;
+
+    // 1. Find the review
+    const review = await Review.findById(reviewId);
+    if (!review) {
+      return res.status(404).json({ message: "Review not found" });
+    }
+
+    // 2. Ensure the logged-in user is the one who wrote the review
+    if (review.user.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: "Not authorized to delete this review" });
+    }
+
+    // 3. Delete the review from the database
+    await review.deleteOne();
+
+    // 4. Fetch all REMAINING reviews for this post
+    const allReviews = await Review.find({ post: postId });
+    const post = await Post.findById(postId);
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    // 5. Recalculate the math
+    post.totalReviews = allReviews.length;
+
+    if (allReviews.length === 0) {
+      post.communityAverageRating = 0;
+    } else {
+      const totalRatingScore = allReviews.reduce((acc, item) => item.rating + acc, 0);
+      post.communityAverageRating = totalRatingScore / allReviews.length;
+    }
+
+    await post.save();
+
+    // 6. ACTIVITY TRIGGER: Clean up the activity feed so the review disappears there too
+    await Activity.findOneAndDelete({
+      actor: req.user._id,
+      actionType: "REVIEW",
+      post: postId,
+    });
+
+    res.status(200).json({ 
+      message: "Review deleted successfully", 
+      communityAverageRating: post.communityAverageRating,
+      totalReviews: post.totalReviews
+    });
+
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete review", error: error.message });
   }
 };
 
@@ -275,6 +347,17 @@ const toggleLike = async (req, res) => {
         actionType: "LIKE",
         post: req.params.id,
       });
+
+      // --- ADD NOTIFICATION HERE ---
+      if (post.author.toString() !== req.user.id.toString()) {
+        const actingUser = await User.findById(req.user.id);
+        sendPushNotification(post.author, {
+          title: "New Like!",
+          body: `${actingUser.username} liked your moment.`,
+          url: `/posts/${post._id}`,
+        });
+      }
+      // -----------------------------
     }
 
     await post.save();
@@ -366,6 +449,7 @@ module.exports = {
   createPost,
   getPostById,
   addReview,
+  deleteReview,
   deletePost,
   toggleLike,
   updatePost,
