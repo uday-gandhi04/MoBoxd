@@ -2,6 +2,7 @@ import { useState, useContext, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
+import { subscribeToPushNotifications } from "../utils/pushHelper";
 
 const MobileHeader = () => {
   const { user, setUser } = useContext(AuthContext);

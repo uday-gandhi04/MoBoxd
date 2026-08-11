@@ -8,6 +8,7 @@ const postRoutes = require('./routes/postRoutes');
 const userRoutes = require('./routes/userRoutes'); 
 const activityRoutes = require('./routes/activityRoutes'); 
 const rankingRoutes = require('./routes/rankingRoutes'); 
+const notificationRoutes = require('./routes/notificationRoutes');
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/users', userRoutes); 
 app.use('/api/activity', activityRoutes);
 app.use('/api/rankings', rankingRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
