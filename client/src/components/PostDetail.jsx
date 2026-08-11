@@ -20,8 +20,17 @@ const PostDetail = () => {
   useEffect(() => {
     const fetchPost = async () => {
       try {
-        const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/posts/${id}`);
-        // Safely extract the post whether the backend wraps it in { post: {...} } or sends it directly
+        // ADDED THIS: Conditionally send the token if the user is logged in
+        const config = user?.token
+          ? { headers: { Authorization: `Bearer ${user.token}` } }
+          : {};
+
+        // ADDED THIS: Passed config to the GET request
+        const response = await axios.get(
+          `${import.meta.env.VITE_API_URL}/api/posts/${id}`, 
+          config
+        );
+        
         const fetchedPost = response.data.post || response.data;
         setPost(fetchedPost);
       } catch (err) {
@@ -31,7 +40,7 @@ const PostDetail = () => {
       }
     };
     fetchPost();
-  }, [id]);
+  }, [id, user?.token]); // ADDED user?.token to dependencies
 
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this moment?')) {
