@@ -49,7 +49,7 @@ const registerUser = async (req, res) => {
       res.status(201).json({
         _id: user.id,
         username: user.username,
-        email: user.email,
+        email: user.email.toLowerCase().trim(),
         displayName: user.displayName,
         profilePicture: user.profilePicture, // ADDED
         bio: user.bio, // ADDED
@@ -79,7 +79,7 @@ const loginUser = async (req, res) => {
       res.json({
         _id: user.id,
         username: user.username,
-        email: user.email,
+        email: user.email.toLowerCase().trim(),
         displayName: user.displayName, // ADDED
         profilePicture: user.profilePicture, // ADDED
         bio: user.bio, // ADDED
