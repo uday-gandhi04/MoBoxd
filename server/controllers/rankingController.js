@@ -2,6 +2,7 @@ const Ranking = require("../models/Ranking");
 const RankingSubmission = require("../models/RankingSubmission");
 const Activity = require("../models/Activity");
 const { sendPushNotification } = require("../utils/pushNotification");
+const User = require("../models/User");
 
 // @desc    Create a new ranking lobby
 // @route   POST /api/rankings

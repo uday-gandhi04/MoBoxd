@@ -64,9 +64,7 @@ const Login = () => {
 
       login(response.data);
 
-      if ("Notification" in window && Notification.permission === "default") {
-        subscribeToPushNotifications(response.data.token, true);
-      }
+      subscribeToPushNotifications(response.data.token, true);
 
       const redirectTo = location.state?.from || "/";
       navigate(redirectTo);
