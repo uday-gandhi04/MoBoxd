@@ -2,9 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
-import { AuthProvider } from './context/AuthContext.jsx'; // Import the provider
+import { AuthProvider } from './context/AuthContext.jsx';
 import './index.css';
-import { GoogleOAuthProvider } from '@react-oauth/google'; // Import the Google OAuth provider
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
@@ -15,5 +15,5 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </AuthProvider>
       </BrowserRouter>
     </GoogleOAuthProvider>
-  </React.StrictMode>,
+  </React.StrictMode>
 );

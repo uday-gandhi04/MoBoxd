@@ -2,6 +2,9 @@ import { useState, useEffect, useContext, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../context/AuthContext';
+import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
+
 
 const Explore = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,20 +135,32 @@ const Explore = () => {
     e.stopPropagation();
 
     const url = `${window.location.origin}/posts/${postId}`;
-    if (navigator.share) {
-      try {
+    const shareTitle = `Check out this moment by @${authorName} on MoBoxd`;
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        // --- NATIVE SHARE (Android / iOS) ---
+        await Share.share({
+          title: shareTitle,
+          text: shareTitle, // iOS often prefers the text field
+          url: url,
+          dialogTitle: 'Share this MoBoxd moment'
+        });
+      } else if (navigator.share) {
+        // --- WEB SHARE (Mobile Browsers) ---
         await navigator.share({
-          title: `Check out this moment by @${authorName} on MoBoxd`,
+          title: shareTitle,
           url: url,
         });
-      } catch (err) {
-        console.log("Share cancelled", err);
+      } else {
+        // --- FALLBACK (Desktop Browsers) ---
+        navigator.clipboard.writeText(url);
+        alert("Post link copied to clipboard!");
       }
-    } else {
-      navigator.clipboard.writeText(url);
-      alert("Post link copied to clipboard!");
+    } catch (err) {
+      console.log("Share cancelled or failed", err);
     }
-  }, []);
+  }, []);;
 
   return (
     <div className="max-w-[470px] mx-auto py-8 px-4">

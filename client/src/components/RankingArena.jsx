@@ -18,6 +18,8 @@ import {
 } from '@dnd-kit/sortable';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import { SortableItem } from './SortableItem';
+import { Capacitor } from '@capacitor/core';
+import { Share } from '@capacitor/share';
 
 const RankingArena = () => {
   const { id } = useParams();
@@ -136,18 +138,30 @@ const RankingArena = () => {
 
   const handleShare = async () => {
     const url = window.location.href;
-    if (navigator.share) {
-      try {
+    const shareTitle = `Join my Ranking Battle: ${lobby.title}`;
+
+    try {
+      if (Capacitor.isNativePlatform()) {
+        // --- NATIVE SHARE (Android / iOS) ---
+        await Share.share({
+          title: shareTitle,
+          text: shareTitle, // Added text field for better iOS/Native support
+          url: url,
+          dialogTitle: 'Share this Ranking Battle'
+        });
+      } else if (navigator.share) {
+        // --- WEB SHARE (Mobile Browsers) ---
         await navigator.share({
-          title: `Join my Ranking Battle: ${lobby.title}`,
+          title: shareTitle,
           url: url
         });
-      } catch (err) {
-        console.log('Share cancelled', err);
+      } else {
+        // --- FALLBACK (Desktop Browsers) ---
+        navigator.clipboard.writeText(url);
+        alert('Link copied to clipboard!');
       }
-    } else {
-      navigator.clipboard.writeText(url);
-      alert('Link copied to clipboard!');
+    } catch (err) {
+      console.log('Share cancelled or failed', err);
     }
   };
 

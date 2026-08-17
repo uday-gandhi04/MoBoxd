@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MoBoxd</string>
+    <string name="title_activity_main">MoBoxd</string>
+    <string name="package_name">com.moboxd.app</string>
+    <string name="custom_url_scheme">com.moboxd.app</string>
+</resources>

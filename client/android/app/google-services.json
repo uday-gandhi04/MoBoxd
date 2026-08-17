@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "524210875357",
+    "project_id": "moboxd-97da5",
+    "storage_bucket": "moboxd-97da5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:524210875357:android:8f034b7d119c043b8e2434",
+        "android_client_info": {
+          "package_name": "com.moboxd.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCA0Hzh06FP2NuI3qe3km7f6hjqdVPGxJs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

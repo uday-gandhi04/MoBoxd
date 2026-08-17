@@ -67,6 +67,24 @@ const userSchema = new mongoose.Schema(
         },
       },
     ],
+
+    deviceTokens: [
+      {
+        platform: {
+          type: String,
+          enum: ["android", "ios"],
+          required: true,
+        },
+        token: {
+          type: String,
+          required: true,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   { timestamps: true },
 );

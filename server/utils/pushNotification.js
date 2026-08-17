@@ -1,52 +1,93 @@
-// backend/utils/pushNotification.js
 const webpush = require("web-push");
+const admin = require("firebase-admin");
 const User = require("../models/User");
 
-// 1. Configure web-push with your keys from .env
+// 1. Configure Web Push
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT,
   process.env.VAPID_PUBLIC_KEY,
   process.env.VAPID_PRIVATE_KEY
 );
 
-// 2. The reusable notification function
+// 2. Configure Firebase Admin (for Android & iOS)
+if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH)),
+    });
+  } catch (e) {
+    console.warn("Firebase Admin already initialized or invalid config:", e.message);
+  }
+}
+
 const sendPushNotification = async (targetUserId, payload) => {
   try {
     const user = await User.findById(targetUserId);
-    
-    // If user doesn't exist or has no subscriptions, just exit quietly
-    if (!user || !user.pushSubscriptions || user.pushSubscriptions.length === 0) {
-      return;
+    if (!user) return;
+
+    let userModified = false;
+
+    // --- A. SEND TO WEB BROWSERS ---
+    if (user.pushSubscriptions && user.pushSubscriptions.length > 0) {
+      const pushPayload = JSON.stringify(payload);
+      
+      const webPromises = user.pushSubscriptions.map(async (sub) => {
+        try {
+          await webpush.sendNotification(sub, pushPayload);
+        } catch (error) {
+          if (error.statusCode === 404 || error.statusCode === 410) {
+            user.pushSubscriptions = user.pushSubscriptions.filter(
+              (s) => s.endpoint !== sub.endpoint
+            );
+            userModified = true;
+          }
+        }
+      });
+      await Promise.all(webPromises);
     }
 
-    const pushPayload = JSON.stringify(payload);
-    let subscriptionsChanged = false;
+    // --- B. SEND TO NATIVE MOBILE (FCM / APNs) ---
+    if (user.deviceTokens && user.deviceTokens.length > 0 && admin.apps.length > 0) {
+      const nativePromises = user.deviceTokens.map(async (device) => {
+        try {
+          const message = {
+            notification: {
+              title: payload.title,
+              body: payload.body,
+            },
+            data: {
+              url: payload.url || "/",
+            },
+            token: device.token,
+            apns: {
+              payload: {
+                aps: {
+                  sound: "default",
+                  badge: 1,
+                },
+              },
+            },
+          };
 
-    // 3. Send the notification to EVERY device the user is logged into
-    const promises = user.pushSubscriptions.map(async (sub) => {
-      try {
-        await webpush.sendNotification(sub, pushPayload);
-      } catch (error) {
-        // 4. Auto-cleanup: If the browser rejected it (410 or 404), the subscription is dead.
-        if (error.statusCode === 404 || error.statusCode === 410) {
-          console.log("Removing expired push subscription");
-          user.pushSubscriptions = user.pushSubscriptions.filter(
-            (s) => s.endpoint !== sub.endpoint
-          );
-          subscriptionsChanged = true;
-        } else {
-          console.error("Push notification failed:", error);
+          await admin.messaging().send(message);
+        } catch (error) {
+          if (
+            error.code === "messaging/invalid-registration-token" ||
+            error.code === "messaging/registration-token-not-registered"
+          ) {
+            user.deviceTokens = user.deviceTokens.filter(
+              (d) => d.token !== device.token
+            );
+            userModified = true;
+          }
         }
-      }
-    });
+      });
+      await Promise.all(nativePromises);
+    }
 
-    await Promise.all(promises);
-
-    // Save the user document if we had to delete any dead subscriptions
-    if (subscriptionsChanged) {
+    if (userModified) {
       await user.save();
     }
-    
   } catch (error) {
     console.error("Error in sendPushNotification helper:", error);
   }
