@@ -6,6 +6,9 @@ node_modules/
 .env.*
 !.env.example
 firebase-service-account.json
+# Firebase client configs (if repo is public)
+client/android/app/google-services.json
+client/ios/App/App/GoogleService-Info.plist
 
 # Build output and test coverage
 dist/
