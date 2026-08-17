@@ -23,48 +23,72 @@ import axios from 'axios';
 import { AuthContext } from './context/AuthContext';
 
 function NativeWrapper({ children }) {
-  const navigate = useNavigate();
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
-    // 1. Hardware Back Button (Android)
-    const backListener = CapApp.addListener('backButton', ({ canGoBack }) => {
-      if (canGoBack) navigate(-1);
-      else CapApp.exitApp();
-    });
+    let backHandle;
+    let urlHandle;
+    let tokenHandle;
+    let tapHandle;
 
-    // 2. Universal Deep Links
-    const appUrlListener = CapApp.addListener('appUrlOpen', (data) => {
-      const path = data.url.split('.com').pop(); 
-      if (path) navigate(path);
-    });
+    const setupListeners = async () => {
+      // 1. Hardware Back Button (Android)
+      backHandle = await CapApp.addListener('backButton', ({ canGoBack }) => {
+        if (canGoBack) {
+          navigate(-1);
+        } else {
+          CapApp.exitApp();
+        }
+      });
 
-    // 3. Native Push Notification Handlers
-    const pushTokenListener = PushNotifications.addListener('registration', (token) => {
-      if (user?.token) {
-        axios.post(
-          `${import.meta.env.VITE_API_URL}/api/notifications/subscribe`,
-          { token: token.value, platform: Capacitor.getPlatform() },
-          { headers: { Authorization: `Bearer ${user.token}` } }
-        );
-      }
-    });
+      // 2. Universal Deep Links (Android App Links / iOS Universal Links)
+      urlHandle = await CapApp.addListener('appUrlOpen', (data) => {
+        try {
+          const parsed = new URL(data.url);
+          const targetPath = `${parsed.pathname}${parsed.search}`;
+          if (targetPath && targetPath !== '/') {
+            navigate(targetPath);
+          }
+        } catch {
+          // Fallback if URL constructor fails on custom schemes
+          const slug = data.url.split('.com').pop();
+          if (slug) navigate(slug);
+        }
+      });
 
-    const pushTapListener = PushNotifications.addListener(
-      'pushNotificationActionPerformed',
-      (notification) => {
-        const url = notification.notification.data.url;
-        if (url) navigate(url);
-      }
-    );
+      // 3. Push Notifications Registration
+      tokenHandle = await PushNotifications.addListener('registration', (token) => {
+        if (user?.token) {
+          axios.post(
+            `${import.meta.env.VITE_API_URL}/api/notifications/subscribe`,
+            { token: token.value, platform: Capacitor.getPlatform() },
+            { headers: { Authorization: `Bearer ${user.token}` } }
+          );
+        }
+      });
+
+      // 4. Push Notification Tap Event
+      tapHandle = await PushNotifications.addListener(
+        'pushNotificationActionPerformed',
+        (notification) => {
+          const targetUrl = notification.notification?.data?.url || notification.notification?.data?.route;
+          if (targetUrl) {
+            navigate(targetUrl);
+          }
+        }
+      );
+    };
+
+    setupListeners();
 
     return () => {
-      backListener.remove();
-      appUrlListener.remove();
-      pushTokenListener.remove();
-      pushTapListener.remove();
+      backHandle?.remove();
+      urlHandle?.remove();
+      tokenHandle?.remove();
+      tapHandle?.remove();
     };
   }, [navigate, user]);
 
@@ -104,7 +128,7 @@ function App() {
         {/* Mobile Bottom Nav (Hidden on Desktop) */}
         <BottomNav onOpenCreateModal={() => setIsCreateModalOpen(true)} />
 
-        {/* Render the Modal at the root level */}
+        {/* Modal at root level */}
         <CreatePostModal 
           isOpen={isCreateModalOpen} 
           onClose={() => setIsCreateModalOpen(false)} 

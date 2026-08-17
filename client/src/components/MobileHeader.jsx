@@ -3,12 +3,16 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import { subscribeToPushNotifications } from "../utils/pushHelper";
+import { Capacitor } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 
 const MobileHeader = () => {
   const { user, setUser } = useContext(AuthContext);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [hasUnreadActivity, setHasUnreadActivity] = useState(false);
   const hideOnRoutes = ["/login", "/signup"];
+  
+  // Default to web status, but we will check native status below
   const [notificationsEnabled, setNotificationsEnabled] = useState(
     "Notification" in window && Notification.permission === "granted"
   );
@@ -20,13 +24,11 @@ const MobileHeader = () => {
 
   // 1. Fetch unread activity status
   useEffect(() => {
-    // 1. If we are currently on the activity page, force the dot off and skip the API call!
     if (location.pathname === "/activity") {
       setHasUnreadActivity(false);
       return;
     }
 
-    // 2. Otherwise, check the backend normally
     const checkUnreadActivity = async () => {
       if (!user) return;
       try {
@@ -45,32 +47,68 @@ const MobileHeader = () => {
     checkUnreadActivity();
   }, [user, location.pathname]);
 
+  // 2. Check Native Notification Permission Status on Mount
+  useEffect(() => {
+    const checkNativePermissions = async () => {
+      if (Capacitor.isNativePlatform()) {
+        const permStatus = await PushNotifications.checkPermissions();
+        setNotificationsEnabled(permStatus.receive === 'granted');
+      }
+    };
+    checkNativePermissions();
+  }, []);
+
   const handleLogout = () => {
     if (typeof setUser === "function") {
-      setUser(null); // This instantly clears the React state
+      setUser(null); 
     }
-    localStorage.removeItem("user"); // This clears the browser memory
+    localStorage.removeItem("user"); 
     setIsSettingsOpen(false);
     navigate("/login");
   };
 
-  
-
+  // 3. Hybrid Toggle Logic
   const handleToggleNotifications = async () => {
     if (notificationsEnabled) {
-      // Browsers do not let websites programmatically "revoke" permission easily.
-      // If they want to turn it off, they have to do it in browser settings.
-      alert("To disable notifications, please click the lock icon in your browser URL bar and block notifications.");
+      // --- TURN OFF ---
+      if (Capacitor.isNativePlatform()) {
+        try {
+          // Tell backend to remove token for this device
+          await axios.post(
+            `${import.meta.env.VITE_API_URL}/api/notifications/unsubscribe`,
+            { platform: Capacitor.getPlatform() }, 
+            { headers: { Authorization: `Bearer ${user.token}` } }
+          );
+          setNotificationsEnabled(false);
+          alert('Notifications paused in MoBoxd. To block them entirely, manage permissions in your Android App Settings.');
+        } catch (error) {
+          console.error("Failed to unsubscribe", error);
+        }
+      } else {
+        // Web fallback
+        alert("To disable notifications, please click the lock icon in your browser URL bar and block notifications.");
+      }
     } else {
-      // Trigger the prompt (not silent, so they get the success alert)
-      const success = await subscribeToPushNotifications(user.token, false);
-      if (success) {
-        setNotificationsEnabled(true);
+      // --- TURN ON ---
+      if (Capacitor.isNativePlatform()) {
+        const permStatus = await PushNotifications.requestPermissions();
+        if (permStatus.receive === 'granted') {
+          // Triggers the App.jsx listener to save the new token
+          await PushNotifications.register();
+          setNotificationsEnabled(true);
+        } else {
+          alert('Permission denied. Please enable notifications for MoBoxd in your phone Settings.');
+        }
+      } else {
+        // Web fallback
+        const success = await subscribeToPushNotifications(user.token, false);
+        if (success) {
+          setNotificationsEnabled(true);
+        }
       }
     }
   };
 
-  // If the current URL matches one of those routes, return null (render nothing)
   if (hideOnRoutes.includes(location.pathname)) {
     return null;
   }
@@ -94,15 +132,13 @@ const MobileHeader = () => {
               <i className="bi bi-gear-fill"></i>
             </button>
           ) : (
-            // --- UPDATED BELL ICON WITH RED DOT ---
             <Link
               to="/activity"
               className="relative text-white hover:text-moboxd-accent transition-colors flex items-center text-2xl"
-              onClick={() => setHasUnreadActivity(false)} // Optimistically clear the dot when clicked
+              onClick={() => setHasUnreadActivity(false)} 
             >
               <i className="bi bi-bell-fill"></i>
 
-              {/* THE RED DOT */}
               {hasUnreadActivity && (
                 <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-[#1A1A21] animate-pulse"></span>
               )}

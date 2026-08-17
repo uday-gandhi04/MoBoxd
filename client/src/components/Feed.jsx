@@ -2,8 +2,8 @@ import { useState, useEffect, useContext, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
-import { Capacitor } from '@capacitor/core';
-import { Share } from '@capacitor/share';
+import { Capacitor } from "@capacitor/core";
+import { Share } from "@capacitor/share";
 
 const Feed = () => {
   const [posts, setPosts] = useState([]);
@@ -26,7 +26,7 @@ const Feed = () => {
       try {
         const response = await axios.get(
           `${import.meta.env.VITE_API_URL}/api/posts/feed`,
-          { headers: { Authorization: `Bearer ${user.token}` } }
+          { headers: { Authorization: `Bearer ${user.token}` } },
         );
         setPosts(response.data);
       } catch (err) {
@@ -43,114 +43,129 @@ const Feed = () => {
   // 2. Memoize bookmarks into an O(1) Set lookup.
   // This prevents running .some() on every post during every render.
   const bookmarkedIds = useMemo(() => {
-    const ids = user?.bookmarks?.map((id) =>
-      String(typeof id === "object" ? id._id : id)
-    ) || [];
+    const ids =
+      user?.bookmarks?.map((id) =>
+        String(typeof id === "object" ? id._id : id),
+      ) || [];
     return new Set(ids);
   }, [user?.bookmarks]);
 
   // 3. Optimistic Like Functionality
-  const handleLike = useCallback(async (e, postId) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleLike = useCallback(
+    async (e, postId) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    if (!user) return alert("Please log in to like moments.");
-    if (likeLoading[postId]) return;
+      if (!user) return alert("Please log in to like moments.");
+      if (likeLoading[postId]) return;
 
-    setLikeLoading((prev) => ({ ...prev, [postId]: true }));
+      setLikeLoading((prev) => ({ ...prev, [postId]: true }));
 
-    const previousPosts = [...posts];
+      const previousPosts = [...posts];
 
-    // Optimistic UI Update
-    setPosts((currentPosts) =>
-      currentPosts.map((post) => {
-        if (post._id === postId) {
-          const isLiked = post.likes?.includes(user._id);
-          const newLikes = isLiked
-            ? post.likes.filter((id) => id !== user._id)
-            : [...(post.likes || []), user._id];
-          return { ...post, likes: newLikes };
-        }
-        return post;
-      })
-    );
-
-    try {
-      const response = await axios.put(
-        `${import.meta.env.VITE_API_URL}/api/posts/${postId}/like`,
-        {},
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-
-      // Sync with the backend's absolute truth
+      // Optimistic UI Update
       setPosts((currentPosts) =>
-        currentPosts.map((post) =>
-          post._id === postId ? { ...post, likes: response.data } : post
-        )
+        currentPosts.map((post) => {
+          if (post._id === postId) {
+            const isLiked = post.likes?.includes(user._id);
+            const newLikes = isLiked
+              ? post.likes.filter((id) => id !== user._id)
+              : [...(post.likes || []), user._id];
+            return { ...post, likes: newLikes };
+          }
+          return post;
+        }),
       );
-    } catch (error) {
-      console.error("Error toggling like:", error);
-      // Revert if API fails
-      setPosts(previousPosts);
-    } finally {
-      setLikeLoading((prev) => ({ ...prev, [postId]: false }));
-    }
-  }, [user, posts, likeLoading]);
+
+      try {
+        const response = await axios.put(
+          `${import.meta.env.VITE_API_URL}/api/posts/${postId}/like`,
+          {},
+          { headers: { Authorization: `Bearer ${user.token}` } },
+        );
+
+        // Sync with the backend's absolute truth
+        setPosts((currentPosts) =>
+          currentPosts.map((post) =>
+            post._id === postId ? { ...post, likes: response.data } : post,
+          ),
+        );
+      } catch (error) {
+        console.error("Error toggling like:", error);
+        // Revert if API fails
+        setPosts(previousPosts);
+      } finally {
+        setLikeLoading((prev) => ({ ...prev, [postId]: false }));
+      }
+    },
+    [user, posts, likeLoading],
+  );
 
   // 4. Optimistic Bookmark Functionality
-  const handleBookmark = useCallback(async (e, postId) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleBookmark = useCallback(
+    async (e, postId) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    if (!user) return alert("Please log in to save moments.");
-    if (bookmarkLoading[postId]) return;
+      if (!user) return alert("Please log in to save moments.");
+      if (bookmarkLoading[postId]) return;
 
-    setBookmarkLoading((prev) => ({ ...prev, [postId]: true }));
+      setBookmarkLoading((prev) => ({ ...prev, [postId]: true }));
 
-    const oldBookmarks = user.bookmarks || [];
-    const isBookmarked = bookmarkedIds.has(String(postId));
+      const oldBookmarks = user.bookmarks || [];
+      const isBookmarked = bookmarkedIds.has(String(postId));
 
-    // Calculate new array ensuring we extract proper IDs
-    const updatedBookmarks = isBookmarked
-      ? oldBookmarks.filter((id) => {
-          const bId = typeof id === "object" ? id._id : id;
-          return String(bId) !== String(postId);
-        })
-      : [...oldBookmarks, postId];
+      // Calculate new array ensuring we extract proper IDs
+      const updatedBookmarks = isBookmarked
+        ? oldBookmarks.filter((id) => {
+            const bId = typeof id === "object" ? id._id : id;
+            return String(bId) !== String(postId);
+          })
+        : [...oldBookmarks, postId];
 
-    // Optimistic UI Update (AuthContext handles localStorage synchronization natively)
-    if (typeof setUser === "function") {
-      setUser((prev) => ({ ...prev, bookmarks: updatedBookmarks }));
-    }
-
-    try {
-      const res = await axios.put(
-        `${import.meta.env.VITE_API_URL}/api/users/bookmarks/${postId}`,
-        {},
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-
-      // Sync with the backend's absolute truth
+      // Optimistic UI Update (AuthContext handles localStorage synchronization natively)
       if (typeof setUser === "function") {
-        setUser((prev) => ({ ...prev, bookmarks: res.data || [] }));
+        setUser((prev) => ({ ...prev, bookmarks: updatedBookmarks }));
       }
-    } catch (err) {
-      console.error("Error toggling bookmark:", err);
-      // Revert if API fails
-      if (typeof setUser === "function") {
-        setUser((prev) => ({ ...prev, bookmarks: oldBookmarks }));
+
+      try {
+        const res = await axios.put(
+          `${import.meta.env.VITE_API_URL}/api/users/bookmarks/${postId}`,
+          {},
+          { headers: { Authorization: `Bearer ${user.token}` } },
+        );
+
+        // Sync with the backend's absolute truth
+        if (typeof setUser === "function") {
+          setUser((prev) => ({ ...prev, bookmarks: res.data || [] }));
+        }
+      } catch (err) {
+        console.error("Error toggling bookmark:", err);
+        // Revert if API fails
+        if (typeof setUser === "function") {
+          setUser((prev) => ({ ...prev, bookmarks: oldBookmarks }));
+        }
+      } finally {
+        setBookmarkLoading((prev) => ({ ...prev, [postId]: false }));
       }
-    } finally {
-      setBookmarkLoading((prev) => ({ ...prev, [postId]: false }));
-    }
-  }, [user, bookmarkedIds, bookmarkLoading, setUser]);
+    },
+    [user, bookmarkedIds, bookmarkLoading, setUser],
+  );
 
   // 5. Memoized Share Handler
   const handleShare = useCallback(async (e, postId, authorName) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const url = `${window.location.origin}/posts/${postId}`;
+    // 1. Default to exactly where the browser currently is (handles local web & prod web)
+    let siteUrl = window.location.origin;
+
+    // 2. Override ONLY if running natively on a phone (fixes the Android/iOS localhost issue)
+    if (Capacitor.isNativePlatform()) {
+      siteUrl = import.meta.env.VITE_SITE_URL;
+    }
+
+    const url = `${siteUrl}/posts/${postId}`;
     const shareTitle = `Check out this moment by @${authorName} on MoBoxd`;
 
     try {
@@ -160,7 +175,7 @@ const Feed = () => {
           title: shareTitle,
           text: shareTitle, // iOS often prefers the text field
           url: url,
-          dialogTitle: 'Share this MoBoxd moment'
+          dialogTitle: "Share this MoBoxd moment",
         });
       } else if (navigator.share) {
         // --- WEB SHARE (Mobile Browsers) ---
@@ -170,11 +185,13 @@ const Feed = () => {
         });
       } else {
         // --- FALLBACK (Desktop Browsers) ---
-        navigator.clipboard.writeText(url);
+        await navigator.clipboard.writeText(url);
         alert("Post link copied to clipboard!");
       }
     } catch (err) {
-      console.log("Share cancelled or failed", err);
+      if (err.name !== "AbortError") {
+        console.log("Share cancelled or failed", err);
+      }
     }
   }, []);
 
@@ -367,7 +384,9 @@ const Feed = () => {
                 {/* Right Side: Share & Bookmark */}
                 <div className="flex items-center gap-5">
                   <button
-                    onClick={(e) => handleShare(e, post._id, post.author.username)}
+                    onClick={(e) =>
+                      handleShare(e, post._id, post.author.username)
+                    }
                     className="group transition-colors focus:outline-none flex items-center"
                     title="Share"
                   >

@@ -22,6 +22,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                
+                <!-- Accept HTTP and HTTPS -->
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                
+                <!-- Your production domain -->
+                <data android:host="moboxd.onrender.com" />
+            </intent-filter>
+
         </activity>
 
         <provider

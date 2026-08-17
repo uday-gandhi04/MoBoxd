@@ -136,34 +136,45 @@ const RankingArena = () => {
     }
   };
 
-  const handleShare = async () => {
-    const url = window.location.href;
-    const shareTitle = `Join my Ranking Battle: ${lobby.title}`;
+const handleShare = async () => {
+  // 1. Default to exactly where the browser currently is (handles both local web and prod web)
+  let siteUrl = window.location.origin;
 
-    try {
-      if (Capacitor.isNativePlatform()) {
-        // --- NATIVE SHARE (Android / iOS) ---
-        await Share.share({
-          title: shareTitle,
-          text: shareTitle, // Added text field for better iOS/Native support
-          url: url,
-          dialogTitle: 'Share this Ranking Battle'
-        });
-      } else if (navigator.share) {
-        // --- WEB SHARE (Mobile Browsers) ---
-        await navigator.share({
-          title: shareTitle,
-          url: url
-        });
-      } else {
-        // --- FALLBACK (Desktop Browsers) ---
-        navigator.clipboard.writeText(url);
-        alert('Link copied to clipboard!');
-      }
-    } catch (err) {
+  // 2. Override ONLY if running natively on a phone (fixes the Android/iOS localhost issue)
+  if (Capacitor.isNativePlatform()) {
+    siteUrl = import.meta.env.VITE_SITE_URL;
+  }
+
+  // Combine the correct base URL with the current page path
+  const url = `${siteUrl}${window.location.pathname}${window.location.search}`;
+  const shareTitle = `Join my Ranking Battle: ${lobby?.title || 'Battle'}`;
+
+  try {
+    if (Capacitor.isNativePlatform()) {
+      // --- NATIVE SHARE (Android / iOS) ---
+      await Share.share({
+        title: shareTitle,
+        text: shareTitle,
+        url: url,
+        dialogTitle: 'Share this Ranking Battle'
+      });
+    } else if (navigator.share) {
+      // --- WEB SHARE (Mobile Browsers) ---
+      await navigator.share({
+        title: shareTitle,
+        url: url
+      });
+    } else {
+      // --- FALLBACK (Desktop Browsers) ---
+      await navigator.clipboard.writeText(url);
+      alert('Link copied to clipboard!');
+    }
+  } catch (err) {
+    if (err.name !== 'AbortError') {
       console.log('Share cancelled or failed', err);
     }
-  };
+  }
+};
 
   const handleDeleteLobby = async () => {
     if (window.confirm("Are you sure you want to delete this entire ranking battle? This cannot be undone.")) {

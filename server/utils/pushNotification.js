@@ -1,6 +1,10 @@
 const webpush = require("web-push");
-const admin = require("firebase-admin");
+// FIX: Use modern modular Firebase Admin imports
+const { initializeApp, cert, getApps } = require("firebase-admin/app");
+const { getMessaging } = require("firebase-admin/messaging");
 const User = require("../models/User");
+const fs = require("fs");
+const path = require("path");
 
 // 1. Configure Web Push
 webpush.setVapidDetails(
@@ -12,11 +16,18 @@ webpush.setVapidDetails(
 // 2. Configure Firebase Admin (for Android & iOS)
 if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert(require(process.env.FIREBASE_SERVICE_ACCOUNT_PATH)),
-    });
+    const serviceAccountPath = path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    
+    // FIX: Check getApps().length and use cert() directly
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: cert(serviceAccount),
+      });
+      console.log("✅ Firebase Admin initialized successfully.");
+    }
   } catch (e) {
-    console.warn("Firebase Admin already initialized or invalid config:", e.message);
+    console.warn("⚠️ Firebase Admin failed to initialize:", e.message);
   }
 }
 
@@ -47,7 +58,8 @@ const sendPushNotification = async (targetUserId, payload) => {
     }
 
     // --- B. SEND TO NATIVE MOBILE (FCM / APNs) ---
-    if (user.deviceTokens && user.deviceTokens.length > 0 && admin.apps.length > 0) {
+    // FIX: Check getApps().length instead of admin.apps.length
+    if (user.deviceTokens && user.deviceTokens.length > 0 && getApps().length > 0) {
       const nativePromises = user.deviceTokens.map(async (device) => {
         try {
           const message = {
@@ -59,6 +71,13 @@ const sendPushNotification = async (targetUserId, payload) => {
               url: payload.url || "/",
             },
             token: device.token,
+            android: {
+              priority: 'high',
+              notification: {
+                sound: 'default',
+                channelId: 'default' 
+              }
+            },
             apns: {
               payload: {
                 aps: {
@@ -69,7 +88,8 @@ const sendPushNotification = async (targetUserId, payload) => {
             },
           };
 
-          await admin.messaging().send(message);
+          // FIX: Use getMessaging().send() instead of admin.messaging()
+          await getMessaging().send(message);
         } catch (error) {
           if (
             error.code === "messaging/invalid-registration-token" ||
@@ -79,6 +99,8 @@ const sendPushNotification = async (targetUserId, payload) => {
               (d) => d.token !== device.token
             );
             userModified = true;
+          } else {
+            console.error("FCM Send Error:", error);
           }
         }
       });
