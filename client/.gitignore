@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Backend secrets
+server/firebase-service-account.json
+*.pem
+*.p8
+*.p12
+
+# Android release keystores / credentials
+client/android/app/debug.keystore
+client/android/app/release.keystore
+*.jks
