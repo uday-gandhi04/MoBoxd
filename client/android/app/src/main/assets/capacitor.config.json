@@ -1,0 +1,20 @@
+{
+	"appId": "com.moboxd.app",
+	"appName": "MoBoxd",
+	"webDir": "dist",
+	"bundledWebRuntime": false,
+	"plugins": {
+		"PushNotifications": {
+			"presentationOptions": [
+				"badge",
+				"sound",
+				"alert"
+			]
+		}
+	},
+	"server": {
+		"androidScheme": "http",
+		"cleartext": true,
+		"iosScheme": "https"
+	}
+}
