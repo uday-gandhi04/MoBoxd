@@ -8,6 +8,7 @@ import { subscribeToPushNotifications } from "../utils/pushHelper";
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -126,7 +127,6 @@ const Login = () => {
               <label className="text-xs font-bold text-moboxd-muted block uppercase tracking-wider">
                 Password
               </label>
-              {/* Added a realistic utility link to balance the label spacing */}
               <a
                 href="#"
                 className="text-xs font-bold text-moboxd-accent hover:underline"
@@ -134,14 +134,25 @@ const Login = () => {
                 Forgot?
               </a>
             </div>
-            <input
-              type="password"
-              className="w-full bg-[#1A1A21] border border-[#2A2A35] rounded-xl p-4 text-white placeholder-moboxd-muted/50 focus:outline-none focus:border-moboxd-accent focus:ring-1 focus:ring-moboxd-accent transition-all"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            {/* Added relative wrapper for positioning */}
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"} 
+                className="w-full bg-[#1A1A21] border border-[#2A2A35] rounded-xl p-4 pr-12 text-white placeholder-moboxd-muted/50 focus:outline-none focus:border-moboxd-accent focus:ring-1 focus:ring-moboxd-accent transition-all"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              {/* Added the toggle button */}
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-moboxd-muted hover:text-black transition-colors cursor-pointer"
+              >
+                <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'} text-xl`}></i>
+              </button>
+            </div>
           </div>
 
           <button
