@@ -13,7 +13,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const app = express();
 
 app.use(cors({
-  origin: ['http://localhost:5173','http://localhost', 'https://moboxd.onrender.com'],
+  origin: ['http://localhost:5173','http://localhost','https://localhost','capacitor://localhost', 'https://moboxd.onrender.com'],
   credentials: true
 }));
 app.use(express.json()); 
@@ -35,7 +35,7 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
         namespace: 'android_app',
         package_name: 'com.moboxd.app',
         sha256_cert_fingerprints: [
-          'AE:E6:1B:71:51:23:0E:62:17:BA:F5:30:D3:6A:9E:4B:44:F2:31:42:24:C8:04:8E:F6:80:EE:DD:85:DB:C5:0C'
+          'D9:ED:05:B4:AF:18:53:21:EE:22:C2:EE:02:02:78:D2:29:FA:B9:4B:AB:14:9D:D4:E4:FC:7E:E0:EC:10:95:40'
         ]
       }
     }
