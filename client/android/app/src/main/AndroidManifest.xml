@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -14,7 +18,7 @@
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:exported="true"
             android:label="@string/title_activity_main"
-            android:launchMode="singleHighInstance"
+            android:launchMode="singleTop"
             android:theme="@style/AppTheme.NoActionBarLaunch">
 
             <intent-filter>
@@ -35,9 +39,5 @@
         </provider>
 
     </application>
-
-    <!-- Permissions -->
-
-    <uses-permission android:name="android.permission.INTERNET" />
 
 </manifest>
