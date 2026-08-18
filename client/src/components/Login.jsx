@@ -1,6 +1,6 @@
 import { useState, useContext } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+import apiClient from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 import { useGoogleLogin } from "@react-oauth/google";
 import { subscribeToPushNotifications } from "../utils/pushHelper";
@@ -23,8 +23,8 @@ const Login = () => {
         setError("");
 
         // Send the access_token directly to our backend
-        const response = await axios.post(
-          `${import.meta.env.VITE_API_URL}/api/users/google`,
+        const response = await apiClient.post(
+          "/api/users/google",
           {
             token: tokenResponse.access_token,
           },
@@ -55,8 +55,8 @@ const Login = () => {
     setError("");
 
     try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/users/login`,
+      const response = await apiClient.post(
+        "/api/users/login",
         {
           email,
           password,
