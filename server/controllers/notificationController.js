@@ -125,4 +125,55 @@ const subscribeUser = async (req, res) => {
   }
 };
 
-module.exports = { subscribeUser };
+const unsubscribeUser = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { platform } = req.body;
+
+    // Native Android / iOS
+    if (
+      platform &&
+      (platform === "android" || platform === "ios")
+    ) {
+      const result = await User.updateOne(
+        { _id: userId },
+        {
+          $pull: {
+            deviceTokens: {
+              platform,
+            },
+          },
+        }
+      );
+
+      if (result.matchedCount === 0) {
+        return res.status(404).json({
+          message: "User not found",
+        });
+      }
+
+      return res.status(200).json({
+        message: `Notifications disabled for ${platform}.`,
+      });
+    }
+
+    // Web push
+    // We intentionally do not remove the web subscription here
+    // because the browser controls permission separately.
+    return res.status(400).json({
+      message: "Invalid unsubscribe platform.",
+    });
+
+  } catch (error) {
+    console.error("Unsubscribe Error:", error);
+
+    return res.status(500).json({
+      message: "Failed to disable notifications.",
+    });
+  }
+};
+
+module.exports = {
+  subscribeUser,
+  unsubscribeUser,
+};
