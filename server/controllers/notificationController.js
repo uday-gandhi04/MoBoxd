@@ -5,44 +5,123 @@ const User = require("../models/User");
 // @access  Private
 const subscribeUser = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const userId = req.user._id;
 
-    // Case A: Native Mobile Token (Android / iOS)
-    if (req.body.platform && (req.body.platform === "android" || req.body.platform === "ios")) {
+    // ==========================================
+    // CASE A: Native Mobile Token
+    // Android / iOS
+    // ==========================================
+    if (
+      req.body.platform &&
+      (req.body.platform === "android" || req.body.platform === "ios")
+    ) {
       const { platform, token } = req.body;
 
-      const exists = user.deviceTokens.some(
-        (dev) => dev.platform === platform && dev.token === token
-      );
-
-      if (!exists) {
-        user.deviceTokens.push({ platform, token });
-        await user.save();
+      if (!token) {
+        return res.status(400).json({
+          message: "Device token is required.",
+        });
       }
 
-      return res.status(201).json({ message: "Native device token saved." });
+      // Atomic update:
+      // Only add the token if the SAME platform + token
+      // combination does not already exist.
+      const result = await User.updateOne(
+        {
+          _id: userId,
+          deviceTokens: {
+            $not: {
+              $elemMatch: {
+                platform,
+                token,
+              },
+            },
+          },
+        },
+        {
+          $push: {
+            deviceTokens: {
+              platform,
+              token,
+            },
+          },
+        }
+      );
+
+      // User not found
+      if (result.matchedCount === 0) {
+        const userExists = await User.exists({ _id: userId });
+
+        if (!userExists) {
+          return res.status(404).json({
+            message: "User not found",
+          });
+        }
+
+        // Token already exists
+        return res.status(200).json({
+          message: "Native device token already exists.",
+        });
+      }
+
+      return res.status(201).json({
+        message: "Native device token saved.",
+      });
     }
 
-    // Case B: Web Push Subscription (Browser) - EXACT existing behavior
+    // ==========================================
+    // CASE B: Web Push Subscription
+    // ==========================================
     const subscription = req.body;
+
     if (subscription && subscription.endpoint) {
-      const exists = user.pushSubscriptions.some(
-        (sub) => sub.endpoint === subscription.endpoint
+      const result = await User.updateOne(
+        {
+          _id: userId,
+          pushSubscriptions: {
+            $not: {
+              $elemMatch: {
+                endpoint: subscription.endpoint,
+              },
+            },
+          },
+        },
+        {
+          $push: {
+            pushSubscriptions: subscription,
+          },
+        }
       );
 
-      if (!exists) {
-        user.pushSubscriptions.push(subscription);
-        await user.save();
+      if (result.matchedCount === 0) {
+        const userExists = await User.exists({ _id: userId });
+
+        if (!userExists) {
+          return res.status(404).json({
+            message: "User not found",
+          });
+        }
+
+        return res.status(200).json({
+          message: "Web subscription already exists.",
+        });
       }
 
-      return res.status(201).json({ message: "Web subscription saved." });
+      return res.status(201).json({
+        message: "Web subscription saved.",
+      });
     }
 
-    res.status(400).json({ message: "Invalid subscription payload." });
+    return res.status(400).json({
+      message: "Invalid subscription payload.",
+    });
+
   } catch (error) {
     console.error("Subscription Error:", error);
-    res.status(500).json({ message: "Failed to save subscription." });
+
+    return res.status(500).json({
+      message: "Failed to save subscription.",
+    });
   }
 };
 
