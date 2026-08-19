@@ -4,6 +4,8 @@ import apiClient from "../api/client";
 import { AuthContext } from "../context/AuthContext";
 import { useGoogleLogin } from "@react-oauth/google";
 import { subscribeToPushNotifications } from "../utils/pushHelper";
+import { Capacitor } from "@capacitor/core";
+import { nativeGoogleLogin } from "../utils/googleAuth";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -19,44 +21,63 @@ const Login = () => {
   // ==========================================
   // GOOGLE LOGIN
   // ==========================================
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      try {
-        setLoading(true);
-        setError("");
+  const handleGoogleLogin = async () => {
+  try {
+    setLoading(true);
+    setError("");
 
-        const response = await apiClient.post(
-          "/api/users/google",
-          {
-            token: tokenResponse.access_token,
-          }
-        );
+    // ==========================================
+    // NATIVE ANDROID / IOS
+    // ==========================================
+    if (Capacitor.isNativePlatform()) {
+      const googleResult = await nativeGoogleLogin();
 
-        // Save logged-in user first
-        login(response.data);
+      const idToken = googleResult?.result?.idToken;
 
-        // Register push notifications
-        // Works for both Web and Android
-        subscribeToPushNotifications(response.data.token);
-
-        const redirectTo = location.state?.from || "/";
-        navigate(redirectTo);
-
-      } catch (err) {
-        console.error("Google Sign-In failed:", err);
-
-        setError("Google Sign-In failed. Please try again.");
-        setLoading(false);
+      if (!idToken) {
+        throw new Error("Google did not return an ID token");
       }
-    },
 
-    onError: (error) => {
-      console.log("Google Auth Error:", error);
+      const response = await apiClient.post(
+        "/api/users/google",
+        {
+          idToken,
+        }
+      );
 
-      setError("Google Sign-In was cancelled or failed.");
-      setLoading(false);
-    },
-  });
+      login(response.data);
+
+      subscribeToPushNotifications(
+        response.data.token
+      );
+
+      const redirectTo =
+        location.state?.from || "/";
+
+      navigate(redirectTo);
+
+      return;
+    }
+
+    // ==========================================
+    // WEB
+    // ==========================================
+    googleLogin();
+
+  } catch (error) {
+    console.error(
+      "Google login failed:",
+      error
+    );
+
+    setError(
+      error.response?.data?.message ||
+      "Google Sign-In failed. Please try again."
+    );
+
+    setLoading(false);
+  }
+};
 
   // ==========================================
   // EMAIL / PASSWORD LOGIN
@@ -208,7 +229,7 @@ const Login = () => {
         {/* GOOGLE LOGIN */}
         <button
           type="button"
-          onClick={() => googleLogin()}
+          onClick={handleGoogleLogin}
           disabled={loading}
           className="w-full bg-[#1A1A21] border border-[#2A2A35] hover:bg-[#2A2A35] text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-3 cursor-pointer active:scale-[0.98] disabled:opacity-50"
         >

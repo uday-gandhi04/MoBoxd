@@ -325,68 +325,127 @@ const updateProfile = async (req, res) => {
 // @route   POST /api/users/google
 // @access  Public
 const googleAuth = async (req, res) => {
-  const { token } = req.body; // This is now the access_token from the frontend
+  const { token, idToken } = req.body;
 
-  if (!token) {
-    return res
-      .status(400)
-      .json({ message: "No authentication token provided" });
+  if (!token && !idToken) {
+    return res.status(400).json({
+      message: "No Google authentication token provided",
+    });
   }
 
   try {
-    // 1. Fetch user data directly from Google using the access_token
-    const googleResponse = await axios.get(
-      "https://www.googleapis.com/oauth2/v3/userinfo",
-      { headers: { Authorization: `Bearer ${token}` } },
-    );
+    let email;
+    let name;
+    let picture;
+    let sub;
 
-    // 2. Extract user data from Google's response
-    const { email, name, picture, sub } = googleResponse.data;
+    // ==========================================
+    // NATIVE ANDROID / IOS
+    // Google ID token
+    // ==========================================
+    if (idToken) {
+      const ticket = await client.verifyIdToken({
+        idToken,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
 
-    // 3. Check if user already exists in our database
+      const payload = ticket.getPayload();
+
+      email = payload.email;
+      name = payload.name;
+      picture = payload.picture;
+      sub = payload.sub;
+    }
+
+    // ==========================================
+    // WEB
+    // Google OAuth access token
+    // ==========================================
+    else {
+      const googleResponse = await axios.get(
+        "https://www.googleapis.com/oauth2/v3/userinfo",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      email = googleResponse.data.email;
+      name = googleResponse.data.name;
+      picture = googleResponse.data.picture;
+      sub = googleResponse.data.sub;
+    }
+
+    if (!email || !sub) {
+      return res.status(401).json({
+        message: "Invalid Google account data",
+      });
+    }
+
+    // ==========================================
+    // FIND OR CREATE USER
+    // ==========================================
+
     let user = await User.findOne({ email });
 
     if (!user) {
-      // Create a unique username based on their email prefix + random numbers
       const baseUsername = email
         .split("@")[0]
         .replace(/[^a-zA-Z0-9]/g, "")
         .toLowerCase();
-      const randomSuffix = Math.floor(1000 + Math.random() * 9000);
 
-      // 4. Create the new user
+      let username = baseUsername;
+
+      // Make username unique
+      while (await User.findOne({ username })) {
+        const randomSuffix = Math.floor(
+          1000 + Math.random() * 9000
+        );
+
+        username = `${baseUsername}${randomSuffix}`;
+      }
+
       user = await User.create({
         displayName: name,
-        username: `${baseUsername}${randomSuffix}`,
+        username,
         email,
-        password: sub, // Use their unique Google ID as a dummy secure password
+        password: sub,
         profilePicture: picture,
       });
     }
 
-    // 5. Send back our custom MoBoxd JWT and user data
+    // ==========================================
+    // RETURN MOBOXD JWT
+    // ==========================================
+
     res.status(200).json({
       _id: user._id,
       displayName: user.displayName,
       username: user.username,
       email: user.email,
       profilePicture: user.profilePicture,
-      bio: user.bio, // ADDED
+      bio: user.bio,
       bookmarks: user.bookmarks,
       token: generateToken(user._id),
     });
+
   } catch (error) {
-    console.error("Google Auth Error:", error.response?.data || error.message);
-    res.status(401).json({ message: "Google authentication failed" });
+    console.error(
+      "Google Auth Error:",
+      error.response?.data || error.message
+    );
+
+    res.status(401).json({
+      message: "Google authentication failed",
+    });
   }
 };
 
 // @desc    Toggle bookmark on a post
 // @route   PUT /api/users/bookmarks/:postId
 // @access  Private
-// @desc    Toggle bookmark on a post
-// @route   PUT /api/users/bookmarks/:postId
-// @access  Private
+
 const toggleBookmark = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);

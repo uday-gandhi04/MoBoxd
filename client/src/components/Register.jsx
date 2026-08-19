@@ -3,6 +3,9 @@ import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import { useGoogleLogin } from "@react-oauth/google";
+import { Capacitor } from "@capacitor/core";
+import { nativeGoogleLogin } from "../utils/googleAuth";
+import { subscribeToPushNotifications } from "../utils/pushHelper";
 
 const Register = () => {
   const [displayName, setDisplayName] = useState("");
@@ -74,9 +77,64 @@ const Register = () => {
     }
   };
 
-  const handleGoogleSignup = () => {
-    alert("Google Sign-In logic to be implemented on the backend!");
-  };
+  const handleGoogleSignup = async () => {
+  try {
+    setLoading(true);
+    setError("");
+
+    // ==========================================
+    // NATIVE ANDROID / IOS
+    // ==========================================
+    if (Capacitor.isNativePlatform()) {
+      const googleResult =
+        await nativeGoogleLogin();
+
+      const idToken =
+        googleResult?.result?.idToken;
+
+      if (!idToken) {
+        throw new Error(
+          "Google did not return an ID token"
+        );
+      }
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/users/google`,
+        {
+          idToken,
+        }
+      );
+
+      login(response.data);
+
+      subscribeToPushNotifications(
+        response.data.token
+      );
+
+      navigate("/");
+
+      return;
+    }
+
+    // ==========================================
+    // WEB
+    // ==========================================
+    googleLogin();
+
+  } catch (error) {
+    console.error(
+      "Google signup failed:",
+      error
+    );
+
+    setError(
+      error.response?.data?.message ||
+      "Google Sign-In failed. Please try again."
+    );
+
+    setLoading(false);
+  }
+};
 
   return (
     <div className="flex items-center justify-center min-h-full px-4 py-12">
@@ -224,7 +282,7 @@ const Register = () => {
 
         <button
           type="button" // Important: change to type="button" so it doesn't submit the form
-          onClick={() => googleLogin()}
+          onClick={handleGoogleSignup}
           className="w-full bg-[#1A1A21] border border-[#2A2A35] hover:bg-[#2A2A35] text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center gap-3 cursor-pointer active:scale-[0.98]"
         >
           <i className="bi bi-google text-lg text-white"></i>
