@@ -10,6 +10,13 @@
 				"sound",
 				"alert"
 			]
+		},
+		"CapacitorUpdater": {
+			"appId": "com.moboxd.app",
+			"updateUrl": "https://moboxd-backend.onrender.com/api/updates",
+			"autoUpdate": "atBackground",
+			"defaultChannel": "production",
+			"resetWhenUpdate": true
 		}
 	},
 	"server": {

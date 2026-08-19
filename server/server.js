@@ -9,6 +9,7 @@ const userRoutes = require('./routes/userRoutes');
 const activityRoutes = require('./routes/activityRoutes'); 
 const rankingRoutes = require('./routes/rankingRoutes'); 
 const notificationRoutes = require('./routes/notificationRoutes');
+const updateRoutes = require("./routes/updateRoutes");
 
 const app = express();
 
@@ -23,7 +24,9 @@ app.use('/api/users', userRoutes);
 app.use('/api/activity', activityRoutes);
 app.use('/api/rankings', rankingRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use("/api/updates", updateRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 
 // Serve Digital Asset Links for Android App Links verification
 app.get('/.well-known/assetlinks.json', (req, res) => {
