@@ -1,12 +1,56 @@
 const semver = require("semver");
 
-const CURRENT_OTA_VERSION = "1.0.1";
+const OTA_MANIFEST_URL =
+  "https://raw.githubusercontent.com/uday-gandhi04/MoBoxd/main/ota/latest.json";
 
-const OTA_URL =
-  "https://github.com/uday-gandhi04/MoBoxd/releases/download/v1.0.1/com.moboxd.app_1.0.1.zip";
+let cachedManifest = null;
+let manifestFetchedAt = 0;
 
-const OTA_CHECKSUM =
-  "bc77f1efe29a84f4803a367b4993047552db815184a5e78712b056654b04788c";
+// Cache the manifest for 5 minutes.
+// This prevents every Android startup from hitting GitHub.
+const MANIFEST_CACHE_DURATION = 5 * 60 * 1000;
+
+const getLatestManifest = async () => {
+  const now = Date.now();
+
+  if (
+    cachedManifest &&
+    now - manifestFetchedAt < MANIFEST_CACHE_DURATION
+  ) {
+    return cachedManifest;
+  }
+
+  const response = await fetch(
+    `${OTA_MANIFEST_URL}?t=${now}`
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      `Failed to fetch OTA manifest: ${response.status}`
+    );
+  }
+
+  const manifest = await response.json();
+
+  if (
+    !manifest.version ||
+    !manifest.url ||
+    !manifest.checksum
+  ) {
+    throw new Error("Invalid OTA manifest");
+  }
+
+  if (!semver.valid(manifest.version)) {
+    throw new Error(
+      `Invalid OTA version: ${manifest.version}`
+    );
+  }
+
+  cachedManifest = manifest;
+  manifestFetchedAt = now;
+
+  return manifest;
+};
 
 const checkForUpdate = async (req, res) => {
   try {
@@ -26,58 +70,69 @@ const checkForUpdate = async (req, res) => {
       plugin_version,
     });
 
-    // Only serve Android OTA updates for now
-    if (platform !== "android") {
+    // Only Android for now
+    if (platform && platform !== "android") {
       return res.json({
-        message: "No update available",
         version: "",
         url: "",
       });
     }
 
-    // Only our MoBoxd app
-    if (app_id && app_id !== "com.moboxd.app") {
+    // Only MoBoxd
+    if (
+      app_id &&
+      app_id !== "com.moboxd.app"
+    ) {
       return res.json({
-        message: "No update available",
         version: "",
         url: "",
       });
     }
 
-    // Capgo may report "builtin" in some cases.
-    // Treat that as the currently installed native bundle.
     const currentVersion =
-      version_name && version_name !== "builtin"
+      version_name &&
+      version_name !== "builtin" &&
+      semver.valid(version_name)
         ? version_name
         : "1.0.0";
 
-    // Don't downgrade.
+    const latest = await getLatestManifest();
+
+    // Already up to date
     if (
-      semver.valid(currentVersion) &&
-      semver.gte(currentVersion, CURRENT_OTA_VERSION)
+      semver.gte(
+        currentVersion,
+        latest.version
+      )
     ) {
+      console.log(
+        `📦 No OTA update: ${currentVersion}`
+      );
+
       return res.json({
-        message: "No update available",
         version: "",
         url: "",
       });
     }
 
     console.log(
-      `📦 OTA update available: ${currentVersion} → ${CURRENT_OTA_VERSION}`
+      `📦 OTA update available: ${currentVersion} → ${latest.version}`
     );
 
     return res.json({
-      version: CURRENT_OTA_VERSION,
-      url: OTA_URL,
-      checksum: OTA_CHECKSUM,
+      version: latest.version,
+      url: latest.url,
+      checksum: latest.checksum,
     });
+
   } catch (error) {
-    console.error("❌ OTA update check failed:", error);
+    console.error(
+      "❌ OTA update check failed:",
+      error
+    );
 
     return res.status(500).json({
       message: "Failed to check for updates",
-      error: "UPDATE_CHECK_FAILED",
     });
   }
 };
