@@ -1,0 +1,118 @@
+name: OTA Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "OTA version (example: 1.0.2)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Validate version
+        shell: bash
+        run: |
+          VERSION="${{ inputs.version }}"
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version: $VERSION"
+            exit 1
+          fi
+
+      - name: Update client version
+        working-directory: client
+        run: |
+          npm version "${{ inputs.version }}" --no-git-tag-version
+
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: client
+        run: npm run build
+
+      - name: Generate OTA bundle
+        working-directory: client
+        run: |
+          npx @capgo/cli bundle zip \
+            --path ./dist \
+            --json
+
+      - name: Find OTA bundle
+        id: bundle
+        shell: bash
+        run: |
+          FILE=$(find client -maxdepth 1 \
+            -type f \
+            -name "com.moboxd.app_${{ inputs.version }}.zip" \
+            -print -quit)
+
+          if [ -z "$FILE" ]; then
+            echo "OTA bundle not found"
+            exit 1
+          fi
+
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Calculate checksum
+        id: checksum
+        shell: bash
+        run: |
+          CHECKSUM=$(sha256sum \
+            "${{ steps.bundle.outputs.file }}" \
+            | awk '{print $1}')
+
+          echo "checksum=$CHECKSUM" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create \
+            "v${{ inputs.version }}" \
+            "${{ steps.bundle.outputs.file }}" \
+            --title "MoBoxd ${{ inputs.version }}" \
+            --generate-notes
+
+      - name: Update OTA manifest
+        shell: bash
+        run: |
+          mkdir -p ota
+
+          cat > ota/latest.json <<EOF
+          {
+            "version": "${{ inputs.version }}",
+            "url": "https://github.com/${{ github.repository }}/releases/download/v${{ inputs.version }}/com.moboxd.app_${{ inputs.version }}.zip",
+            "checksum": "${{ steps.checksum.outputs.checksum }}"
+          }
+          EOF
+
+      - name: Commit release metadata
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add client/package.json client/package-lock.json ota/latest.json
+
+          git commit \
+            -m "Release MoBoxd ${{ inputs.version }}"
+
+          git push
