@@ -1,118 +1,244 @@
 const webpush = require("web-push");
-// FIX: Use modern modular Firebase Admin imports
-const { initializeApp, cert, getApps } = require("firebase-admin/app");
-const { getMessaging } = require("firebase-admin/messaging");
+
+const {
+  initializeApp,
+  cert,
+  getApps,
+} = require("firebase-admin/app");
+
+const {
+  getMessaging,
+} = require("firebase-admin/messaging");
+
 const User = require("../models/User");
+
 const fs = require("fs");
 const path = require("path");
 
-// 1. Configure Web Push
+// ==========================================
+// WEB PUSH
+// ==========================================
+
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT,
   process.env.VAPID_PUBLIC_KEY,
   process.env.VAPID_PRIVATE_KEY
 );
 
-// 2. Configure Firebase Admin (for Android & iOS)
+// ==========================================
+// FIREBASE ADMIN
+// ==========================================
+
 if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
   try {
-    const serviceAccountPath = path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH);
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-    
-    // FIX: Check getApps().length and use cert() directly
+    const serviceAccountPath = path.resolve(
+      process.cwd(),
+      process.env.FIREBASE_SERVICE_ACCOUNT_PATH
+    );
+
+    const serviceAccount = JSON.parse(
+      fs.readFileSync(
+        serviceAccountPath,
+        "utf8"
+      )
+    );
+
     if (getApps().length === 0) {
       initializeApp({
         credential: cert(serviceAccount),
       });
-      console.log("✅ Firebase Admin initialized successfully.");
+
+      console.log(
+        "✅ Firebase Admin initialized successfully."
+      );
     }
   } catch (e) {
-    console.warn("⚠️ Firebase Admin failed to initialize:", e.message);
+    console.warn(
+      "⚠️ Firebase Admin failed to initialize:",
+      e.message
+    );
   }
 }
 
-const sendPushNotification = async (targetUserId, payload) => {
+
+// ==========================================
+// SEND PUSH NOTIFICATION
+// ==========================================
+
+const sendPushNotification = async (
+  targetUserId,
+  payload
+) => {
   try {
     const user = await User.findById(targetUserId);
-    if (!user) return;
 
-    let userModified = false;
+    if (!user) {
+      return;
+    }
 
-    // --- A. SEND TO WEB BROWSERS ---
-    if (user.pushSubscriptions && user.pushSubscriptions.length > 0) {
-      const pushPayload = JSON.stringify(payload);
-      
-      const webPromises = user.pushSubscriptions.map(async (sub) => {
-        try {
-          await webpush.sendNotification(sub, pushPayload);
-        } catch (error) {
-          if (error.statusCode === 404 || error.statusCode === 410) {
-            user.pushSubscriptions = user.pushSubscriptions.filter(
-              (s) => s.endpoint !== sub.endpoint
-            );
-            userModified = true;
+    // ==========================================
+    // A. WEB PUSH
+    // ==========================================
+
+    if (
+      user.pushSubscriptions &&
+      user.pushSubscriptions.length > 0
+    ) {
+      const pushPayload =
+        JSON.stringify(payload);
+
+      const webPromises =
+        user.pushSubscriptions.map(
+          async (subscription) => {
+            try {
+              await webpush.sendNotification(
+                subscription,
+                pushPayload
+              );
+
+              console.log(
+                "✅ Web push sent:",
+                subscription.endpoint
+              );
+
+            } catch (error) {
+              // Subscription is permanently invalid
+              if (
+                error.statusCode === 404 ||
+                error.statusCode === 410
+              ) {
+                console.log(
+                  "🧹 Removing invalid web subscription"
+                );
+
+                // IMPORTANT:
+                // Do NOT mutate `user` and call user.save().
+                // Use an atomic MongoDB update instead.
+                await User.updateOne(
+                  { _id: targetUserId },
+                  {
+                    $pull: {
+                      pushSubscriptions: {
+                        endpoint:
+                          subscription.endpoint,
+                      },
+                    },
+                  }
+                );
+
+              } else {
+                console.error(
+                  "❌ Web Push Error:",
+                  error
+                );
+              }
+            }
           }
-        }
-      });
+        );
+
       await Promise.all(webPromises);
     }
 
-    // --- B. SEND TO NATIVE MOBILE (FCM / APNs) ---
-    // FIX: Check getApps().length instead of admin.apps.length
-    if (user.deviceTokens && user.deviceTokens.length > 0 && getApps().length > 0) {
-      const nativePromises = user.deviceTokens.map(async (device) => {
-        try {
-          const message = {
-            notification: {
-              title: payload.title,
-              body: payload.body,
-            },
-            data: {
-              url: payload.url || "/",
-            },
-            token: device.token,
-            android: {
-              priority: 'high',
-              notification: {
-                sound: 'default',
-                channelId: 'default' 
-              }
-            },
-            apns: {
-              payload: {
-                aps: {
-                  sound: "default",
-                  badge: 1,
-                },
-              },
-            },
-          };
 
-          // FIX: Use getMessaging().send() instead of admin.messaging()
-          await getMessaging().send(message);
-        } catch (error) {
-          if (
-            error.code === "messaging/invalid-registration-token" ||
-            error.code === "messaging/registration-token-not-registered"
-          ) {
-            user.deviceTokens = user.deviceTokens.filter(
-              (d) => d.token !== device.token
-            );
-            userModified = true;
-          } else {
-            console.error("FCM Send Error:", error);
+    // ==========================================
+    // B. NATIVE PUSH
+    // Android / iOS
+    // ==========================================
+
+    if (
+      user.deviceTokens &&
+      user.deviceTokens.length > 0 &&
+      getApps().length > 0
+    ) {
+      const nativePromises =
+        user.deviceTokens.map(
+          async (device) => {
+            try {
+              const message = {
+                notification: {
+                  title: payload.title,
+                  body: payload.body,
+                },
+
+                data: {
+                  url: payload.url || "/",
+                },
+
+                token: device.token,
+
+                android: {
+                  priority: "high",
+
+                  notification: {
+                    sound: "default",
+                    channelId: "default",
+                  },
+                },
+
+                apns: {
+                  payload: {
+                    aps: {
+                      sound: "default",
+                      badge: 1,
+                    },
+                  },
+                },
+              };
+
+              await getMessaging().send(
+                message
+              );
+
+              console.log(
+                `✅ ${device.platform} push sent`
+              );
+
+            } catch (error) {
+              const invalidToken =
+                error.code ===
+                  "messaging/invalid-registration-token" ||
+                error.code ===
+                  "messaging/registration-token-not-registered";
+
+              if (invalidToken) {
+                console.log(
+                  "🧹 Removing invalid FCM/APNs token"
+                );
+
+                // IMPORTANT:
+                // Atomic removal — no user.save().
+                await User.updateOne(
+                  { _id: targetUserId },
+                  {
+                    $pull: {
+                      deviceTokens: {
+                        token: device.token,
+                      },
+                    },
+                  }
+                );
+
+              } else {
+                console.error(
+                  "❌ FCM Send Error:",
+                  error
+                );
+              }
+            }
           }
-        }
-      });
+        );
+
       await Promise.all(nativePromises);
     }
 
-    if (userModified) {
-      await user.save();
-    }
   } catch (error) {
-    console.error("Error in sendPushNotification helper:", error);
+    console.error(
+      "Error in sendPushNotification helper:",
+      error
+    );
   }
 };
 
-module.exports = { sendPushNotification };
+module.exports = {
+  sendPushNotification,
+};
