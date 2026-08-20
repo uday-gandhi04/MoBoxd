@@ -15,9 +15,9 @@ const User = require("../models/User");
 const fs = require("fs");
 const path = require("path");
 
-// ==========================================
-// WEB PUSH
-// ==========================================
+// ============================================================
+// WEB PUSH CONFIGURATION
+// ============================================================
 
 webpush.setVapidDetails(
   process.env.VAPID_SUBJECT,
@@ -25,9 +25,9 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY
 );
 
-// ==========================================
-// FIREBASE ADMIN
-// ==========================================
+// ============================================================
+// FIREBASE ADMIN CONFIGURATION
+// ============================================================
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
   try {
@@ -37,10 +37,7 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
     );
 
     const serviceAccount = JSON.parse(
-      fs.readFileSync(
-        serviceAccountPath,
-        "utf8"
-      )
+      fs.readFileSync(serviceAccountPath, "utf8")
     );
 
     if (getApps().length === 0) {
@@ -52,18 +49,17 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_PATH) {
         "✅ Firebase Admin initialized successfully."
       );
     }
-  } catch (e) {
+  } catch (error) {
     console.warn(
       "⚠️ Firebase Admin failed to initialize:",
-      e.message
+      error.message
     );
   }
 }
 
-
-// ==========================================
+// ============================================================
 // SEND PUSH NOTIFICATION
-// ==========================================
+// ============================================================
 
 const sendPushNotification = async (
   targetUserId,
@@ -73,27 +69,84 @@ const sendPushNotification = async (
     const user = await User.findById(targetUserId);
 
     if (!user) {
+      console.warn(
+        "⚠️ Push target user not found:",
+        targetUserId
+      );
+
       return;
     }
 
-    // ==========================================
+    // ========================================================
     // A. WEB PUSH
-    // ==========================================
+    // ========================================================
 
     if (
       user.pushSubscriptions &&
       user.pushSubscriptions.length > 0
     ) {
-      const pushPayload =
-        JSON.stringify(payload);
+      console.log(
+        `🌐 Sending to ${user.pushSubscriptions.length} web subscription(s)`
+      );
 
       const webPromises =
         user.pushSubscriptions.map(
           async (subscription) => {
+            // ----------------------------------------------
+            // Validate Web Push subscription
+            // ----------------------------------------------
+
+            const isValidSubscription =
+              subscription &&
+              subscription.endpoint &&
+              subscription.keys &&
+              subscription.keys.auth &&
+              subscription.keys.p256dh;
+
+            if (!isValidSubscription) {
+              console.warn(
+                "🧹 Removing malformed web subscription:",
+                subscription?.endpoint ||
+                  "(missing endpoint)"
+              );
+
+              try {
+                await User.updateOne(
+                  { _id: targetUserId },
+                  {
+                    $pull: {
+                      pushSubscriptions: {
+                        _id: subscription?._id,
+                      },
+                    },
+                  }
+                );
+              } catch (cleanupError) {
+                console.error(
+                  "❌ Failed to remove malformed web subscription:",
+                  cleanupError
+                );
+              }
+
+              return;
+            }
+
+            // ----------------------------------------------
+            // Send Web Push
+            // ----------------------------------------------
+
             try {
               await webpush.sendNotification(
-                subscription,
-                pushPayload
+                {
+                  endpoint:
+                    subscription.endpoint,
+                  keys: {
+                    auth: subscription.keys.auth,
+                    p256dh:
+                      subscription.keys.p256dh,
+                  },
+                },
+                JSON.stringify(payload)
               );
 
               console.log(
@@ -102,35 +155,46 @@ const sendPushNotification = async (
               );
 
             } catch (error) {
-              // Subscription is permanently invalid
+              console.error(
+                "❌ Web Push Error:",
+                {
+                  statusCode:
+                    error.statusCode,
+                  message: error.message,
+                  endpoint:
+                    subscription.endpoint,
+                }
+              );
+
+              // ------------------------------------------------
+              // 404/410 = expired or no longer valid
+              // ------------------------------------------------
+
               if (
                 error.statusCode === 404 ||
                 error.statusCode === 410
               ) {
                 console.log(
-                  "🧹 Removing invalid web subscription"
+                  "🧹 Removing expired web subscription"
                 );
 
-                // IMPORTANT:
-                // Do NOT mutate `user` and call user.save().
-                // Use an atomic MongoDB update instead.
-                await User.updateOne(
-                  { _id: targetUserId },
-                  {
-                    $pull: {
-                      pushSubscriptions: {
-                        endpoint:
-                          subscription.endpoint,
+                try {
+                  await User.updateOne(
+                    { _id: targetUserId },
+                    {
+                      $pull: {
+                        pushSubscriptions: {
+                          _id: subscription._id,
+                        },
                       },
-                    },
-                  }
-                );
-
-              } else {
-                console.error(
-                  "❌ Web Push Error:",
-                  error
-                );
+                    }
+                  );
+                } catch (cleanupError) {
+                  console.error(
+                    "❌ Failed to remove expired web subscription:",
+                    cleanupError
+                  );
+                }
               }
             }
           }
@@ -139,96 +203,171 @@ const sendPushNotification = async (
       await Promise.all(webPromises);
     }
 
-
-    // ==========================================
+    // ========================================================
     // B. NATIVE PUSH
     // Android / iOS
-    // ==========================================
+    // ========================================================
 
     if (
       user.deviceTokens &&
-      user.deviceTokens.length > 0 &&
-      getApps().length > 0
+      user.deviceTokens.length > 0
     ) {
-      const nativePromises =
-        user.deviceTokens.map(
-          async (device) => {
-            try {
-              const message = {
-                notification: {
-                  title: payload.title,
-                  body: payload.body,
-                },
+      console.log(
+        `📱 Sending to ${user.deviceTokens.length} native device token(s)`
+      );
 
-                data: {
-                  url: payload.url || "/",
-                },
-
-                token: device.token,
-
-                android: {
-                  priority: "high",
-
-                  notification: {
-                    sound: "default",
-                    channelId: "default",
-                  },
-                },
-
-                apns: {
-                  payload: {
-                    aps: {
-                      sound: "default",
-                      badge: 1,
-                    },
-                  },
-                },
-              };
-
-              await getMessaging().send(
-                message
-              );
-
-              console.log(
-                `✅ ${device.platform} push sent`
-              );
-
-            } catch (error) {
-              const invalidToken =
-                error.code ===
-                  "messaging/invalid-registration-token" ||
-                error.code ===
-                  "messaging/registration-token-not-registered";
-
-              if (invalidToken) {
-                console.log(
-                  "🧹 Removing invalid FCM/APNs token"
+      // Firebase must be initialized
+      if (getApps().length === 0) {
+        console.error(
+          "❌ Firebase Admin is not initialized. Cannot send native push."
+        );
+      } else {
+        const nativePromises =
+          user.deviceTokens.map(
+            async (device) => {
+              if (
+                !device ||
+                !device.token
+              ) {
+                console.warn(
+                  "⚠️ Skipping invalid native device entry"
                 );
 
-                // IMPORTANT:
-                // Atomic removal — no user.save().
-                await User.updateOne(
-                  { _id: targetUserId },
-                  {
-                    $pull: {
-                      deviceTokens: {
-                        token: device.token,
+                return;
+              }
+
+              const platform =
+                device.platform || "unknown";
+
+              try {
+                // --------------------------------------------
+                // FCM message
+                // --------------------------------------------
+
+                const message = {
+                  token: device.token,
+
+                  notification: {
+                    title:
+                      payload.title ||
+                      "MoBoxd",
+                    body:
+                      payload.body ||
+                      "",
+                  },
+
+                  data: {
+                    // FCM data values must be strings
+                    url: String(
+                      payload.url || "/"
+                    ),
+                    route: String(
+                      payload.route || ""
+                    ),
+                  },
+
+                  android: {
+                    priority: "high",
+
+                    notification: {
+                      sound: "default",
+                      channelId: "default",
+                    },
+                  },
+
+                  apns: {
+                    payload: {
+                      aps: {
+                        sound: "default",
+                        badge: 1,
                       },
                     },
+                  },
+                };
+
+                // --------------------------------------------
+                // Send FCM
+                // --------------------------------------------
+
+                const messageId =
+                  await getMessaging().send(
+                    message
+                  );
+
+                console.log(
+                  `✅ ${platform} push sent:`,
+                  {
+                    token:
+                      device.token.length > 20
+                        ? `${device.token.slice(
+                            0,
+                            20
+                          )}...`
+                        : device.token,
+                    messageId,
                   }
                 );
 
-              } else {
+              } catch (error) {
                 console.error(
-                  "❌ FCM Send Error:",
-                  error
+                  `❌ ${platform} push failed:`,
+                  {
+                    code: error.code,
+                    message:
+                      error.message,
+                    token:
+                      device.token.length > 20
+                        ? `${device.token.slice(
+                            0,
+                            20
+                          )}...`
+                        : device.token,
+                  }
                 );
+
+                // --------------------------------------------
+                // Remove invalid FCM/APNs tokens
+                // --------------------------------------------
+
+                const invalidToken =
+                  error.code ===
+                    "messaging/invalid-registration-token" ||
+                  error.code ===
+                    "messaging/registration-token-not-registered";
+
+                if (invalidToken) {
+                  console.log(
+                    `🧹 Removing invalid ${platform} token`
+                  );
+
+                  try {
+                    await User.updateOne(
+                      { _id: targetUserId },
+                      {
+                        $pull: {
+                          deviceTokens: {
+                            token: device.token,
+                          },
+                        },
+                      }
+                    );
+
+                    console.log(
+                      "✅ Invalid native token removed"
+                    );
+                  } catch (cleanupError) {
+                    console.error(
+                      "❌ Failed to remove invalid native token:",
+                      cleanupError
+                    );
+                  }
+                }
               }
             }
-          }
-        );
+          );
 
-      await Promise.all(nativePromises);
+        await Promise.all(nativePromises);
+      }
     }
 
   } catch (error) {
