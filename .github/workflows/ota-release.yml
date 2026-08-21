@@ -116,6 +116,16 @@ jobs:
           fi
 
           echo "✅ Google Client ID is present in the production build"
+      - name: Check API URL in build
+        working-directory: client
+        shell: bash
+        run: |
+          if grep -R -q "https://moboxd-backend.onrender.com" dist/assets; then
+            echo "✅ Backend API URL exists in build"
+          else
+            echo "❌ Backend API URL is NOT in build"
+            exit 1
+          fi
 
       # ======================================================
       # CREATE OTA ZIP
