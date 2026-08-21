@@ -66,6 +66,25 @@ const createPost = async (req, res) => {
       totalReviews: 0,
     });
 
+    // ==========================================
+    // PUSH: Notify followers about new post
+    // ==========================================
+    if (visibility === "PUBLIC" || visibility === "FOLLOWERS") {
+      const creator = await User.findById(req.user._id).select(
+        "username followers",
+      );
+
+      if (creator && creator.followers && creator.followers.length > 0) {
+        creator.followers.forEach((followerId) => {
+          sendPushNotification(followerId, {
+            title: "New Post",
+            body: `${creator.username} posted something new.`,
+            url: `/posts/${newPost._id}`,
+          });
+        });
+      }
+    }
+
     const populatedPost = await Post.findById(newPost._id).populate(
       "author",
       "username profilePicture",
@@ -231,7 +250,7 @@ const addReview = async (req, res) => {
 const deleteReview = async (req, res) => {
   try {
     // --- THE FIX: Extract 'id' to match your route definitions ---
-    const postId = req.params.id; 
+    const postId = req.params.id;
     const reviewId = req.params.reviewId;
 
     // 1. Find the review
@@ -242,7 +261,9 @@ const deleteReview = async (req, res) => {
 
     // 2. Ensure the logged-in user is the one who wrote the review
     if (review.user.toString() !== req.user._id.toString()) {
-      return res.status(401).json({ message: "Not authorized to delete this review" });
+      return res
+        .status(401)
+        .json({ message: "Not authorized to delete this review" });
     }
 
     // 3. Delete the review from the database
@@ -262,7 +283,10 @@ const deleteReview = async (req, res) => {
     if (allReviews.length === 0) {
       post.communityAverageRating = 0;
     } else {
-      const totalRatingScore = allReviews.reduce((acc, item) => item.rating + acc, 0);
+      const totalRatingScore = allReviews.reduce(
+        (acc, item) => item.rating + acc,
+        0,
+      );
       post.communityAverageRating = totalRatingScore / allReviews.length;
     }
 
@@ -275,14 +299,15 @@ const deleteReview = async (req, res) => {
       post: postId,
     });
 
-    res.status(200).json({ 
-      message: "Review deleted successfully", 
+    res.status(200).json({
+      message: "Review deleted successfully",
       communityAverageRating: post.communityAverageRating,
-      totalReviews: post.totalReviews
+      totalReviews: post.totalReviews,
     });
-
   } catch (error) {
-    res.status(500).json({ message: "Failed to delete review", error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to delete review", error: error.message });
   }
 };
 
