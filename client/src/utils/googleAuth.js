@@ -10,9 +10,21 @@ export const initializeGoogleAuth = async () => {
     return;
   }
 
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+  console.log("🔐 Google OAuth config:", {
+    exists: !!googleClientId,
+    length: googleClientId?.length || 0,
+    suffix: googleClientId ? googleClientId.slice(-25) : null,
+  });
+
+  if (!googleClientId) {
+    throw new Error("VITE_GOOGLE_CLIENT_ID is missing from runtime build");
+  }
+
   await SocialLogin.initialize({
     google: {
-      webClientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+      webClientId: googleClientId,
       mode: "online",
     },
   });
@@ -36,10 +48,7 @@ export const nativeGoogleLogin = async () => {
     },
   });
 
-  console.log(
-    "✅ Native Google login result:",
-    result
-  );
+  console.log("✅ Native Google login result:", result);
 
   return result;
 };
