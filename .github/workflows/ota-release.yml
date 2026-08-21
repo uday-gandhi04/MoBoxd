@@ -91,11 +91,11 @@ jobs:
       # BUILD FRONTEND
       # ======================================================
 
-      - - name: Build frontend
-          working-directory: client
-          env:
-            VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          run: npm run build
+      - name: Build frontend
+        working-directory: client
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        run: npm run build
 
       # ======================================================
       # CREATE OTA ZIP
