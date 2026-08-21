@@ -25,14 +25,21 @@ export const initializeGoogleAuth = async () => {
 export const nativeGoogleLogin = async () => {
   await initializeGoogleAuth();
 
+  console.log("🔐 Starting native Google Sign-In");
+
   const result = await SocialLogin.login({
     provider: "google",
     options: {
       scopes: ["email", "profile"],
+      filterByAuthorizedAccounts: false,
+      style: "bottom",
     },
   });
 
-  console.log("Google native login result:", result);
+  console.log(
+    "✅ Native Google login result:",
+    result
+  );
 
   return result;
 };
