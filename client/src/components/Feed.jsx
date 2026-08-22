@@ -4,6 +4,7 @@ import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
+import FeedSkeleton from "./FeedSkeleton";
 
 const Feed = () => {
   const [posts, setPosts] = useState([]);
@@ -232,11 +233,7 @@ const Feed = () => {
         </h1>
       </div>
 
-      {loading && (
-        <div className="flex justify-center mt-10">
-          <div className="w-8 h-8 border-4 border-moboxd-accent border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      )}
+      {loading && <FeedSkeleton />}
 
       {error && (
         <div className="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-xl mb-6">
