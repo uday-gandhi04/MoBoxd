@@ -4,6 +4,7 @@ import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
+import FeedSkeleton from "./FeedSkeleton";
 
 const Explore = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -254,9 +255,7 @@ const Explore = () => {
           </div>
 
           {postsLoading ? (
-            <div className="flex justify-center mt-10">
-              <div className="w-8 h-8 border-4 border-moboxd-accent border-t-transparent rounded-full animate-spin"></div>
-            </div>
+            <FeedSkeleton />
           ) : (
             globalPosts.map((post) => {
               const isLiked = user && post.likes?.includes(user._id);
@@ -339,7 +338,11 @@ const Explore = () => {
                         className="flex items-center gap-2 group transition-colors focus:outline-none cursor-pointer"
                       >
                         <i
-                          className={`bi bi-heart${isLiked ? "-fill text-red-500" : " text-moboxd-muted group-hover:text-red-500"}`}
+                          className={`bi bi-heart${
+                            isLiked
+                              ? "-fill text-red-500"
+                              : " text-moboxd-muted group-hover:text-red-500"
+                          }`}
                         ></i>
                         <span
                           className={
