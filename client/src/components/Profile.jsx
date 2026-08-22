@@ -1,8 +1,14 @@
 import { useState, useEffect, useContext } from "react";
-import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
+import {
+  useParams,
+  Link,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import EditProfileModal from "./EditProfileModal";
+import UserListModal from "./UserListModal";
 
 const Profile = () => {
   const { username } = useParams();
@@ -12,6 +18,7 @@ const Profile = () => {
   // Read the URL to see if we should start on a specific tab
   const queryParams = new URLSearchParams(location.search);
   const tabParam = queryParams.get("tab");
+
   const initialTab =
     tabParam === "saved"
       ? "SAVED"
@@ -24,7 +31,7 @@ const Profile = () => {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [profileUser, setProfileUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
-  const [userRankings, setUserRankings] = useState([]); // NEW STATE FOR RANKINGS
+  const [userRankings, setUserRankings] = useState([]);
   const [savedPosts, setSavedPosts] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -37,19 +44,37 @@ const Profile = () => {
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // ==========================================
+  // FOLLOWERS / FOLLOWING MODAL
+  // ==========================================
+
+  const [userListOpen, setUserListOpen] = useState(false);
+  const [userListTab, setUserListTab] = useState("followers");
+
+  const openUserList = (tab) => {
+    setUserListTab(tab);
+    setUserListOpen(true);
+  };
+
   // Watch URL changes for sidebar clicks
   useEffect(() => {
     const currentParams = new URLSearchParams(location.search);
     const currentTab = currentParams.get("tab");
-    if (currentTab === "saved") setActiveTab("SAVED");
-    else if (currentTab === "rankings") setActiveTab("RANKINGS");
-    else setActiveTab("MOMENTS");
+
+    if (currentTab === "saved") {
+      setActiveTab("SAVED");
+    } else if (currentTab === "rankings") {
+      setActiveTab("RANKINGS");
+    } else {
+      setActiveTab("MOMENTS");
+    }
   }, [location.search]);
 
   // Fetch the main profile data (User, Posts, and Rankings)
   useEffect(() => {
     const fetchProfile = async () => {
       setLoading(true);
+
       try {
         const config = user
           ? {
@@ -63,23 +88,31 @@ const Profile = () => {
           `${import.meta.env.VITE_API_URL}/api/users/${username}`,
           config,
         );
+
         const fetchedUser = response.data.user;
 
         setProfileUser(fetchedUser);
         setUserPosts(response.data.posts);
-        setUserRankings(response.data.rankings || []); // SET RANKINGS HERE
+        setUserRankings(response.data.rankings || []);
 
         setFollowerCount(fetchedUser.followers?.length || 0);
         setFollowingCount(fetchedUser.following?.length || 0);
 
-        if (user && fetchedUser.followers?.includes(user._id)) {
+        if (
+          user &&
+          fetchedUser.followers?.includes(user._id)
+        ) {
           setIsFollowing(true);
         } else {
           setIsFollowing(false);
         }
+
         setLoading(false);
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load profile");
+        setError(
+          err.response?.data?.message ||
+            "Failed to load profile",
+        );
         setLoading(false);
       }
     };
@@ -96,13 +129,17 @@ const Profile = () => {
         user.username === profileUser?.username
       ) {
         setLoadingSaved(true);
+
         try {
           const response = await axios.get(
             `${import.meta.env.VITE_API_URL}/api/users/bookmarks`,
             {
-              headers: { Authorization: `Bearer ${user.token}` },
+              headers: {
+                Authorization: `Bearer ${user.token}`,
+              },
             },
           );
+
           setSavedPosts(response.data);
         } catch (err) {
           console.error("Failed to load saved posts");
@@ -111,16 +148,26 @@ const Profile = () => {
         }
       }
     };
+
     fetchBookmarks();
   }, [activeTab, user, profileUser]);
 
   const handleFollowToggle = async () => {
-    if (!user) return alert("You must be logged in to follow users.");
+    if (!user) {
+      return alert(
+        "You must be logged in to follow users.",
+      );
+    }
+
     try {
       await axios.put(
         `${import.meta.env.VITE_API_URL}/api/users/${profileUser._id}/follow`,
         {},
-        { headers: { Authorization: `Bearer ${user.token}` } },
+        {
+          headers: {
+            Authorization: `Bearer ${user.token}`,
+          },
+        },
       );
 
       if (isFollowing) {
@@ -131,8 +178,13 @@ const Profile = () => {
         setIsFollowing(true);
       }
     } catch (error) {
-      console.error("Failed to toggle follow:", error);
-      alert("Something went wrong. Please try again.");
+      console.error(
+        "Failed to toggle follow:",
+        error,
+      );
+      alert(
+        "Something went wrong. Please try again.",
+      );
     }
   };
 
@@ -152,7 +204,10 @@ const Profile = () => {
     );
   }
 
-  const displayPosts = activeTab === "MOMENTS" ? userPosts : savedPosts;
+  const displayPosts =
+    activeTab === "MOMENTS"
+      ? userPosts
+      : savedPosts;
 
   return (
     <div className="max-w-4xl mx-auto py-10 px-4">
@@ -176,11 +231,14 @@ const Profile = () => {
           <div className="flex flex-col md:flex-row items-center md:justify-between gap-4 mb-6">
             <div>
               <h2 className="text-3xl font-extrabold text-white tracking-wide">
-                {profileUser.displayName || profileUser.username}
+                {profileUser.displayName ||
+                  profileUser.username}
               </h2>
+
               <p className="text-moboxd-accent font-medium mt-1">
                 @{profileUser.username.toLowerCase()}
               </p>
+
               {profileUser.bio && (
                 <p className="text-gray-300 mt-3 text-sm max-w-md mx-auto md:mx-0 leading-relaxed">
                   {profileUser.bio}
@@ -189,16 +247,27 @@ const Profile = () => {
             </div>
 
             {/* Follow / Edit Button */}
-            {user && user.username !== profileUser.username ? (
+            {user &&
+            user.username !== profileUser.username ? (
               <button
                 onClick={handleFollowToggle}
-                className={`px-6 py-2 rounded-xl font-bold transition-colors w-full md:w-auto ${isFollowing ? "bg-[#2A2A35] text-white hover:bg-[#3A3A45]" : "bg-moboxd-accent text-black hover:bg-yellow-400"}`}
+                className={`px-6 py-2 rounded-xl font-bold transition-colors w-full md:w-auto ${
+                  isFollowing
+                    ? "bg-[#2A2A35] text-white hover:bg-[#3A3A45]"
+                    : "bg-moboxd-accent text-black hover:bg-yellow-400"
+                }`}
               >
-                {isFollowing ? "Unfollow" : "Follow"}
+                {isFollowing
+                  ? "Unfollow"
+                  : "Follow"}
               </button>
-            ) : user && user.username === profileUser.username ? (
+            ) : user &&
+              user.username ===
+                profileUser.username ? (
               <button
-                onClick={() => setIsEditModalOpen(true)}
+                onClick={() =>
+                  setIsEditModalOpen(true)
+                }
                 className="px-6 py-2 rounded-xl font-bold bg-[#2A2A35] text-white hover:bg-[#3A3A45] transition-colors w-full md:w-auto cursor-pointer"
               >
                 Edit Profile
@@ -208,38 +277,61 @@ const Profile = () => {
 
           {/* Stats Bar */}
           <div className="flex items-center justify-center md:justify-start gap-8 md:gap-12 text-center mt-6">
+            {/* Moments */}
             <div className="flex flex-col">
               <span className="text-2xl font-bold text-white">
                 {userPosts.length}
               </span>
+
               <span className="text-xs text-moboxd-muted uppercase tracking-widest">
                 Moments
               </span>
             </div>
+
+            {/* Rankings */}
             <div className="flex flex-col">
               <span className="text-2xl font-bold text-white">
                 {userRankings.length}
               </span>
+
               <span className="text-xs text-moboxd-muted uppercase tracking-widest">
                 Rankings
               </span>
             </div>
-            <div className="flex flex-col">
+
+            {/* Followers */}
+            <button
+              type="button"
+              onClick={() =>
+                openUserList("followers")
+              }
+              className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity"
+            >
               <span className="text-2xl font-bold text-white">
                 {followerCount}
               </span>
+
               <span className="text-xs text-moboxd-muted uppercase tracking-widest">
                 Followers
               </span>
-            </div>
-            <div className="flex flex-col">
+            </button>
+
+            {/* Following */}
+            <button
+              type="button"
+              onClick={() =>
+                openUserList("following")
+              }
+              className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity"
+            >
               <span className="text-2xl font-bold text-white">
                 {followingCount}
               </span>
+
               <span className="text-xs text-moboxd-muted uppercase tracking-widest">
                 Following
               </span>
-            </div>
+            </button>
           </div>
         </div>
       </div>
@@ -251,66 +343,102 @@ const Profile = () => {
             setActiveTab("MOMENTS");
             navigate(`/profile/${username}`);
           }}
-          className={`pb-3 border-b-2 font-bold tracking-wide flex items-center gap-2 transition-colors ${activeTab === "MOMENTS" ? "border-moboxd-accent text-white" : "border-transparent text-moboxd-muted hover:text-white"}`}
+          className={`pb-3 border-b-2 font-bold tracking-wide flex items-center gap-2 transition-colors ${
+            activeTab === "MOMENTS"
+              ? "border-moboxd-accent text-white"
+              : "border-transparent text-moboxd-muted hover:text-white"
+          }`}
         >
-          <i className="bi bi-grid-3x3"></i> Moments
+          <i className="bi bi-grid-3x3"></i>{" "}
+          Moments
         </button>
 
         <button
           onClick={() => {
             setActiveTab("RANKINGS");
-            navigate(`/profile/${username}?tab=rankings`);
+            navigate(
+              `/profile/${username}?tab=rankings`,
+            );
           }}
-          className={`pb-3 border-b-2 font-bold tracking-wide flex items-center gap-2 transition-colors ${activeTab === "RANKINGS" ? "border-moboxd-accent text-white" : "border-transparent text-moboxd-muted hover:text-white"}`}
+          className={`pb-3 border-b-2 font-bold tracking-wide flex items-center gap-2 transition-colors ${
+            activeTab === "RANKINGS"
+              ? "border-moboxd-accent text-white"
+              : "border-transparent text-moboxd-muted hover:text-white"
+          }`}
         >
-          <i className="bi bi-trophy"></i> Rankings
+          <i className="bi bi-trophy"></i>{" "}
+          Rankings
         </button>
 
-        {user && profileUser && user.username === profileUser.username && (
-          <button
-            onClick={() => {
-              setActiveTab("SAVED");
-              navigate(`/profile/${username}?tab=saved`);
-            }}
-            className={`pb-3 border-b-2 font-bold tracking-wide flex items-center gap-2 transition-colors ${activeTab === "SAVED" ? "border-moboxd-accent text-white" : "border-transparent text-moboxd-muted hover:text-white"}`}
-          >
-            <i className="bi bi-bookmark"></i> Saved
-          </button>
-        )}
+        {user &&
+          profileUser &&
+          user.username ===
+            profileUser.username && (
+            <button
+              onClick={() => {
+                setActiveTab("SAVED");
+                navigate(
+                  `/profile/${username}?tab=saved`,
+                );
+              }}
+              className={`pb-3 border-b-2 font-bold tracking-wide flex items-center gap-2 transition-colors ${
+                activeTab === "SAVED"
+                  ? "border-moboxd-accent text-white"
+                  : "border-transparent text-moboxd-muted hover:text-white"
+              }`}
+            >
+              <i className="bi bi-bookmark"></i>{" "}
+              Saved
+            </button>
+          )}
       </div>
 
       {/* Empty States */}
-      {activeTab === "MOMENTS" && userPosts.length === 0 && (
-        <div className="text-center text-moboxd-muted mt-20">
-          <i className="bi bi-camera text-5xl mb-4 block"></i>
-          <h5 className="text-xl font-bold text-white mb-2">No moments yet.</h5>
-        </div>
-      )}
+      {activeTab === "MOMENTS" &&
+        userPosts.length === 0 && (
+          <div className="text-center text-moboxd-muted mt-20">
+            <i className="bi bi-camera text-5xl mb-4 block"></i>
 
-      {activeTab === "RANKINGS" && userRankings.length === 0 && (
-        <div className="text-center text-moboxd-muted mt-20">
-          <i className="bi bi-trophy text-5xl mb-4 block"></i>
-          <h5 className="text-xl font-bold text-white mb-2">
-            No rankings yet.
-          </h5>
-        </div>
-      )}
+            <h5 className="text-xl font-bold text-white mb-2">
+              No moments yet.
+            </h5>
+          </div>
+        )}
 
-      {activeTab === "SAVED" && savedPosts.length === 0 && !loadingSaved && (
-        <div className="text-center text-moboxd-muted mt-20">
-          <i className="bi bi-bookmark-dash text-5xl mb-4 block"></i>
-          <h5 className="text-xl font-bold text-white mb-2">
-            Nothing saved yet.
-          </h5>
-          <p>Tap the bookmark icon on any post to save it for later.</p>
-        </div>
-      )}
+      {activeTab === "RANKINGS" &&
+        userRankings.length === 0 && (
+          <div className="text-center text-moboxd-muted mt-20">
+            <i className="bi bi-trophy text-5xl mb-4 block"></i>
 
-      {loadingSaved && activeTab === "SAVED" && (
-        <div className="flex justify-center mt-20">
-          <div className="w-8 h-8 border-4 border-moboxd-accent border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      )}
+            <h5 className="text-xl font-bold text-white mb-2">
+              No rankings yet.
+            </h5>
+          </div>
+        )}
+
+      {activeTab === "SAVED" &&
+        savedPosts.length === 0 &&
+        !loadingSaved && (
+          <div className="text-center text-moboxd-muted mt-20">
+            <i className="bi bi-bookmark-dash text-5xl mb-4 block"></i>
+
+            <h5 className="text-xl font-bold text-white mb-2">
+              Nothing saved yet.
+            </h5>
+
+            <p>
+              Tap the bookmark icon on any post
+              to save it for later.
+            </p>
+          </div>
+        )}
+
+      {loadingSaved &&
+        activeTab === "SAVED" && (
+          <div className="flex justify-center mt-20">
+            <div className="w-8 h-8 border-4 border-moboxd-accent border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
 
       {/* Feed Rendering */}
       {activeTab === "RANKINGS" ? (
@@ -324,16 +452,21 @@ const Profile = () => {
               <h3 className="text-xl font-bold text-white mb-2">
                 {ranking.title}
               </h3>
+
               <p className="text-moboxd-muted text-sm line-clamp-2">
-                {ranking.items && ranking.items.length > 0
-                  ? ranking.items.map((i) => i.name).join(", ")
+                {ranking.items &&
+                ranking.items.length > 0
+                  ? ranking.items
+                      .map((i) => i.name)
+                      .join(", ")
                   : "No items listed"}
               </p>
             </Link>
           ))}
         </div>
       ) : (
-        (!loadingSaved || activeTab === "MOMENTS") && (
+        (!loadingSaved ||
+          activeTab === "MOMENTS") && (
           <div className="grid grid-cols-3 gap-1 md:gap-4">
             {displayPosts.map((post) => (
               <Link
@@ -348,13 +481,16 @@ const Profile = () => {
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                 </div>
+
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-6">
                   <div className="flex items-center gap-2 text-white font-bold">
                     <i className="bi bi-heart-fill text-red-500"></i>{" "}
                     {post.likes?.length || 0}
                   </div>
+
                   <div className="flex items-center gap-2 text-white font-bold">
-                    <i className="bi bi-chat-fill"></i> {post.totalReviews || 0}
+                    <i className="bi bi-chat-fill"></i>{" "}
+                    {post.totalReviews || 0}
                   </div>
                 </div>
               </Link>
@@ -363,20 +499,49 @@ const Profile = () => {
         )
       )}
 
+      {/* Followers / Following Modal */}
+      <UserListModal
+        isOpen={userListOpen}
+        onClose={() => setUserListOpen(false)}
+        username={profileUser.username}
+        initialTab={userListTab}
+        onFollowChange={() => {
+          // Count synchronization will be added
+          // in the next step.
+        }}
+      />
+
       {/* Edit Profile Modal */}
       <EditProfileModal
         isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        onClose={() =>
+          setIsEditModalOpen(false)
+        }
         profileData={profileUser}
         onUpdateSuccess={(updatedData) => {
-          setProfileUser((prev) => ({ ...prev, ...updatedData }));
+          setProfileUser((prev) => ({
+            ...prev,
+            ...updatedData,
+          }));
+
           if (setUser) {
-            setUser((prev) => ({ ...prev, ...updatedData }));
-            const storedUser = JSON.parse(localStorage.getItem("user"));
+            setUser((prev) => ({
+              ...prev,
+              ...updatedData,
+            }));
+
+            const storedUser =
+              JSON.parse(
+                localStorage.getItem("user"),
+              );
+
             if (storedUser) {
               localStorage.setItem(
                 "user",
-                JSON.stringify({ ...storedUser, ...updatedData }),
+                JSON.stringify({
+                  ...storedUser,
+                  ...updatedData,
+                }),
               );
             }
           }

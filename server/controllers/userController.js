@@ -513,11 +513,11 @@ const getBookmarkedPosts = async (req, res) => {
 // @access  Public
 const getFollowers = async (req, res) => {
   try {
-    const user = await User.findOne({
+    const profileUser = await User.findOne({
       username: req.params.username,
     }).select("followers");
 
-    if (!user) {
+    if (!profileUser) {
       return res.status(404).json({
         message: "User not found",
       });
@@ -525,62 +525,80 @@ const getFollowers = async (req, res) => {
 
     const page = Math.max(
       parseInt(req.query.page, 10) || 1,
-      1
+      1,
     );
 
     const limit = Math.min(
       Math.max(
         parseInt(req.query.limit, 10) || 25,
-        1
+        1,
       ),
-      50
+      50,
     );
 
     const start = (page - 1) * limit;
 
-    const followerIds = user.followers || [];
+    const followerIds = profileUser.followers || [];
 
     const ids = followerIds.slice(
       start,
-      start + limit
+      start + limit,
     );
 
     const users = await User.find({
       _id: { $in: ids },
     })
       .select(
-        "_id username displayName profilePicture followers following"
+        "_id username displayName profilePicture followers following",
       )
       .lean();
 
-    // Preserve the same order as the IDs stored in followers
+    // Preserve the order stored in the follower array
     const userMap = new Map(
-      users.map((u) => [u._id.toString(), u])
+      users.map((user) => [
+        user._id.toString(),
+        user,
+      ]),
     );
+
+    // The currently authenticated viewer
+    const currentUserFollowing = req.user?.following || [];
 
     const orderedUsers = ids
       .map((id) => userMap.get(id.toString()))
       .filter(Boolean)
-      .map((u) => ({
-        _id: u._id,
-        username: u.username,
-        displayName: u.displayName,
-        profilePicture: u.profilePicture,
-        followersCount: u.followers?.length || 0,
-        followingCount: u.following?.length || 0,
-      }));
+      .map((user) => ({
+        _id: user._id,
+        username: user.username,
+        displayName: user.displayName,
+        profilePicture: user.profilePicture,
 
-    const hasMore =
-      start + limit < followerIds.length;
+        followersCount:
+          user.followers?.length || 0,
+
+        followingCount:
+          user.following?.length || 0,
+
+        // Is the logged-in viewer following this person?
+        isFollowing: currentUserFollowing.some(
+          (followingId) =>
+            followingId.toString() ===
+            user._id.toString(),
+        ),
+      }));
 
     return res.status(200).json({
       users: orderedUsers,
       page,
       limit,
-      hasMore,
+      hasMore:
+        start + limit < followerIds.length,
     });
   } catch (error) {
-    console.error("Error fetching followers:", error);
+    console.error(
+      "Error fetching followers:",
+      error,
+    );
 
     return res.status(500).json({
       message: "Failed to fetch followers",
@@ -594,11 +612,11 @@ const getFollowers = async (req, res) => {
 // @access  Public
 const getFollowing = async (req, res) => {
   try {
-    const user = await User.findOne({
+    const profileUser = await User.findOne({
       username: req.params.username,
     }).select("following");
 
-    if (!user) {
+    if (!profileUser) {
       return res.status(404).json({
         message: "User not found",
       });
@@ -606,62 +624,79 @@ const getFollowing = async (req, res) => {
 
     const page = Math.max(
       parseInt(req.query.page, 10) || 1,
-      1
+      1,
     );
 
     const limit = Math.min(
       Math.max(
         parseInt(req.query.limit, 10) || 25,
-        1
+        1,
       ),
-      50
+      50,
     );
 
     const start = (page - 1) * limit;
 
-    const followingIds = user.following || [];
+    const followingIds =
+      profileUser.following || [];
 
     const ids = followingIds.slice(
       start,
-      start + limit
+      start + limit,
     );
 
     const users = await User.find({
       _id: { $in: ids },
     })
       .select(
-        "_id username displayName profilePicture followers following"
+        "_id username displayName profilePicture followers following",
       )
       .lean();
 
-    // Preserve the same order as the IDs stored in following
     const userMap = new Map(
-      users.map((u) => [u._id.toString(), u])
+      users.map((user) => [
+        user._id.toString(),
+        user,
+      ]),
     );
+
+    const currentUserFollowing =
+      req.user?.following || [];
 
     const orderedUsers = ids
       .map((id) => userMap.get(id.toString()))
       .filter(Boolean)
-      .map((u) => ({
-        _id: u._id,
-        username: u.username,
-        displayName: u.displayName,
-        profilePicture: u.profilePicture,
-        followersCount: u.followers?.length || 0,
-        followingCount: u.following?.length || 0,
-      }));
+      .map((user) => ({
+        _id: user._id,
+        username: user.username,
+        displayName: user.displayName,
+        profilePicture: user.profilePicture,
 
-    const hasMore =
-      start + limit < followingIds.length;
+        followersCount:
+          user.followers?.length || 0,
+
+        followingCount:
+          user.following?.length || 0,
+
+        isFollowing: currentUserFollowing.some(
+          (followingId) =>
+            followingId.toString() ===
+            user._id.toString(),
+        ),
+      }));
 
     return res.status(200).json({
       users: orderedUsers,
       page,
       limit,
-      hasMore,
+      hasMore:
+        start + limit < followingIds.length,
     });
   } catch (error) {
-    console.error("Error fetching following:", error);
+    console.error(
+      "Error fetching following:",
+      error,
+    );
 
     return res.status(500).json({
       message: "Failed to fetch following",

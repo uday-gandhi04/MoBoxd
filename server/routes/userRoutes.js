@@ -31,8 +31,9 @@ router.get("/search", searchUsers);
 // Protected follow route
 router.put("/:id/follow", protect, toggleFollow); // <-- Add this route
 
+router.get("/:username/followers",optionalProtect, getFollowers);
+router.get("/:username/following", optionalProtect, getFollowing);
 router.get("/:username", optionalProtect, getUserProfile);
-router.get("/:username/followers", getFollowers);
-router.get("/:username/following", getFollowing);
+
 
 module.exports = router;
