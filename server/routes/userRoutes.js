@@ -10,6 +10,8 @@ const {
   googleAuth,
   toggleBookmark,
   getBookmarkedPosts,
+  getFollowers,
+  getFollowing,
 } = require("../controllers/userController");
 
 const { protect, optionalProtect } = require("../middleware/authMiddleware"); // <-- Import auth middleware
@@ -30,5 +32,7 @@ router.get("/search", searchUsers);
 router.put("/:id/follow", protect, toggleFollow); // <-- Add this route
 
 router.get("/:username", optionalProtect, getUserProfile);
+router.get("/:username/followers", getFollowers);
+router.get("/:username/following", getFollowing);
 
 module.exports = router;
