@@ -2,6 +2,9 @@ import { useState, useContext, useRef, useCallback } from "react";
 import axios from "axios";
 import { AuthContext } from "../context/AuthContext";
 import Cropper from "react-easy-crop";
+import {
+  MOMENT_CATEGORIES,
+} from "../constants/categories";
 
 // ============================================================
 // IMAGE CROP HELPERS
@@ -146,22 +149,7 @@ const CreatePostModal = ({
   // CATEGORIES
   // ==========================================================
 
-  const categories = [
-    "Food",
-    "Places",
-    "Travel",
-    "Movies & TV",
-    "Music",
-    "Books",
-    "Games",
-    "Sports",
-    "Events",
-    "Fashion",
-    "Technology",
-    "Products",
-    "People",
-    "Other",
-  ];
+  const categories = MOMENT_CATEGORIES;
 
   const linkTypes = [
     {

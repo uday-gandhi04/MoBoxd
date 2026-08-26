@@ -15,11 +15,17 @@ const {
   deleteRankingLobby,
   deleteMySubmission,
   getLobbySubmissions,
+  getRankingCategories,
+  searchRankings,
 } = require("../controllers/rankingController");
 
 router.get("/feed", protect, getRankingsFeed);
 
 router.post("/", protect, createRanking);
+
+router.get("/search", searchRankings);
+
+router.get("/categories", getRankingCategories);
 
 router.get("/:id", optionalProtect, getRankingById);
 

@@ -10,15 +10,16 @@ const {
   deletePost,
   toggleLike,
   updatePost,
-  getCategories
+  getCategories,
+  searchPosts,
 } = require("../controllers/postController");
+
 const {
   protect,
   optionalProtect,
 } = require("../middleware/authMiddleware");
 const { upload } = require("../config/cloudinary");
 
-// Base routes (/api/posts)
 router.route("/")
   .get(optionalProtect, getFeedPosts)
   .post(protect, upload.single("image"), createPost);
@@ -28,18 +29,16 @@ router.route("/feed")
 
 router.get('/categories', getCategories);
 
-// Single post routes (/api/posts/:id)
-// Grouped all single-ID operations into one block
+router.get("/search", searchPosts);
+
 router.route("/:id")
   .get(optionalProtect, getPostById)
   .put(protect, updatePost)
   .delete(protect, deletePost);
 
-// Like route (/api/posts/:id/like)
 router.route("/:id/like")
   .put(protect, toggleLike);
 
-// Review routes (/api/posts/:id/reviews)
 router.route("/:id/reviews")
   .post(protect, addReview);
 

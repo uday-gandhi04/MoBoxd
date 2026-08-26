@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { MOMENT_CATEGORIES } = require("../constants/categories");
 
 const PostSchema = new mongoose.Schema(
   {
@@ -39,6 +40,7 @@ const PostSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      enum: MOMENT_CATEGORIES,
     },
 
     // ==========================================================
@@ -112,20 +114,13 @@ const PostSchema = new mongoose.Schema(
     // ==========================================================
     visibility: {
       type: String,
-      enum: [
-        "PUBLIC",
-        "FOLLOWERS",
-        "PRIVATE",
-      ],
+      enum: ["PUBLIC", "FOLLOWERS", "PRIVATE"],
       default: "PUBLIC",
     },
   },
   {
     timestamps: true,
-  }
+  },
 );
 
-module.exports = mongoose.model(
-  "Post",
-  PostSchema
-);
+module.exports = mongoose.model("Post", PostSchema);

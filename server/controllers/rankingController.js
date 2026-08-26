@@ -8,6 +8,9 @@ const User = require("../models/User");
 // @route   POST /api/rankings
 // @access  Private
 // ... existing imports ...
+const escapeRegex = (value) => {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
 
 const createRanking = async (req, res) => {
   try {
@@ -35,7 +38,7 @@ const createRanking = async (req, res) => {
     // --- ADD NOTIFICATION HERE ---
     if (visibility === "PUBLIC" || visibility === "FOLLOWERS") {
       const creator = await User.findById(req.user._id);
-      
+
       // Send a push to every user in the creator's followers array
       if (creator.followers && creator.followers.length > 0) {
         creator.followers.forEach((followerId) => {
@@ -99,7 +102,7 @@ const submitRanking = async (req, res) => {
         actionType: "SUBMIT_RANKING",
         ranking: rankingId,
       });
-      
+
       // --- ADD NOTIFICATION HERE ---
       if (ranking.creator.toString() !== req.user._id.toString()) {
         const actingUser = await User.findById(req.user._id);
@@ -373,6 +376,153 @@ const getLobbySubmissions = async (req, res) => {
   }
 };
 
+const getRankingCategories = async (req, res) => {
+  try {
+    const categories = await Ranking.distinct("category");
+
+    const cleanCategories = [
+      ...new Set(categories.filter(Boolean).map((category) => category.trim())),
+    ].sort((a, b) => a.localeCompare(b));
+
+    res.status(200).json(cleanCategories);
+  } catch (error) {
+    console.error("Failed to fetch ranking categories:", error);
+
+    res.status(500).json({
+      message: "Failed to fetch ranking categories",
+    });
+  }
+};
+
+const searchRankings = async (req, res) => {
+  try {
+    const { q = "", category = "" } = req.query;
+
+    const search = q.trim();
+
+    const query = {};
+
+    // ==========================================================
+    // VISIBILITY
+    // Same rules as ranking feed:
+    //
+    // PUBLIC
+    // creator's own rankings
+    // rankings the user has participated in
+    // ==========================================================
+
+    if (req.user) {
+      const mySubmissions = await RankingSubmission.find({
+        userId: req.user._id,
+      }).select("rankingId");
+
+      const participatedRankingIds = mySubmissions.map(
+        (submission) => submission.rankingId,
+      );
+
+      query.$or = [
+        {
+          visibility: "PUBLIC",
+        },
+        {
+          creator: req.user._id,
+        },
+        {
+          _id: {
+            $in: participatedRankingIds,
+          },
+        },
+      ];
+    } else {
+      query.visibility = "PUBLIC";
+    }
+
+    // ==========================================================
+    // CATEGORY
+    // ==========================================================
+
+    if (category && category.trim() && category !== "All") {
+      query.category = new RegExp(`^${escapeRegex(category.trim())}$`, "i");
+    }
+
+    // ==========================================================
+    // TEXT SEARCH
+    // ==========================================================
+
+    if (search) {
+      const escapedSearch = escapeRegex(search);
+
+      const matchingCreators = await User.find({
+        username: {
+          $regex: escapedSearch,
+          $options: "i",
+        },
+      }).select("_id");
+
+      const textConditions = [
+        {
+          title: {
+            $regex: escapedSearch,
+            $options: "i",
+          },
+        },
+        {
+          description: {
+            $regex: escapedSearch,
+            $options: "i",
+          },
+        },
+        {
+          category: {
+            $regex: escapedSearch,
+            $options: "i",
+          },
+        },
+        {
+          "items.name": {
+            $regex: escapedSearch,
+            $options: "i",
+          },
+        },
+      ];
+
+      if (matchingCreators.length) {
+        textConditions.push({
+          creator: {
+            $in: matchingCreators.map((creator) => creator._id),
+          },
+        });
+      }
+
+      query.$and = [
+        {
+          $or: textConditions,
+        },
+      ];
+    }
+
+    // ==========================================================
+    // FETCH
+    // ==========================================================
+
+    const rankings = await Ranking.find(query)
+      .populate("creator", "username profilePicture displayName")
+      .sort({
+        createdAt: -1,
+      })
+      .limit(50);
+
+    res.status(200).json(rankings);
+  } catch (error) {
+    console.error("Ranking search error:", error);
+
+    res.status(500).json({
+      message: "Failed to search rankings",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createRanking,
   submitRanking,
@@ -382,4 +532,6 @@ module.exports = {
   deleteRankingLobby,
   deleteMySubmission,
   getLobbySubmissions,
+  getRankingCategories,
+  searchRankings,
 };
