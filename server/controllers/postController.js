@@ -5,6 +5,31 @@ const Activity = require("../models/Activity");
 const Ranking = require("../models/Ranking");
 const { sendPushNotification } = require("../utils/pushNotification");
 
+
+const parseTags = (tags) => {
+  if (!tags) return [];
+
+  try {
+    const parsed =
+      typeof tags === "string"
+        ? JSON.parse(tags)
+        : tags;
+
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return [...new Set(
+      parsed
+        .map((tag) => String(tag).trim().toLowerCase())
+        .filter(Boolean)
+        .slice(0, 10)
+    )];
+  } catch {
+    return [];
+  }
+};
+
 // @desc    Get all posts for the home feed
 // @route   GET /api/posts
 // @access  Public (for now)
@@ -49,53 +74,163 @@ const getFeedPosts = async (req, res) => {
 
 const createPost = async (req, res) => {
   try {
-    const { caption, category, authorRating, visibility } = req.body;
+    const {
+      title,
+      caption,
+      category,
+      tags,
+      relatedLink,
+      linkType,
+      authorRating,
+      visibility,
+    } = req.body;
+
+    // ==========================================
+    // VALIDATION
+    // ==========================================
 
     if (!req.file) {
-      return res.status(400).json({ message: "An image is required" });
+      return res.status(400).json({
+        message: "An image is required",
+      });
     }
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        message: "A title is required",
+      });
+    }
+
+    if (!category || !category.trim()) {
+      return res.status(400).json({
+        message: "A category is required",
+      });
+    }
+
+    // ==========================================
+    // PARSE TAGS
+    // ==========================================
+
+    const parsedTags = parseTags(tags);
+
+    // ==========================================
+    // RELATED ITEM
+    // ==========================================
+
+    let relatedItem;
+
+    if (relatedLink && relatedLink.trim()) {
+      if (!linkType) {
+        return res.status(400).json({
+          message: "Related link type is required",
+        });
+      }
+
+      try {
+        new URL(relatedLink.trim());
+      } catch {
+        return res.status(400).json({
+          message: "Invalid related link URL",
+        });
+      }
+
+      relatedItem = {
+        type: linkType,
+        url: relatedLink.trim(),
+      };
+    }
+
+    // ==========================================
+    // CREATE POST
+    // ==========================================
 
     const newPost = await Post.create({
       author: req.user._id,
       imageUrl: req.file.path,
-      caption,
-      category,
-      visibility,
-      authorRating: Number(authorRating),
+
+      title: title.trim(),
+      caption: caption?.trim() || "",
+
+      category: category.trim(),
+
+      tags: parsedTags,
+
+      relatedItem,
+
+      visibility:
+        visibility || "PUBLIC",
+
+      authorRating: Number(
+        authorRating
+      ),
+
       communityAverageRating: 0,
       totalReviews: 0,
     });
 
     // ==========================================
-    // PUSH: Notify followers about new post
+    // PUSH:
+    // NOTIFY FOLLOWERS ABOUT NEW POST
     // ==========================================
-    if (visibility === "PUBLIC" || visibility === "FOLLOWERS") {
-      const creator = await User.findById(req.user._id).select(
-        "username followers",
-      );
 
-      if (creator && creator.followers && creator.followers.length > 0) {
-        creator.followers.forEach((followerId) => {
-          sendPushNotification(followerId, {
-            title: "New Post",
-            body: `${creator.username} posted something new.`,
-            url: `/posts/${newPost._id}`,
-          });
-        });
+    if (
+      visibility === "PUBLIC" ||
+      visibility === "FOLLOWERS"
+    ) {
+      const creator =
+        await User.findById(
+          req.user._id
+        ).select(
+          "username followers"
+        );
+
+      if (
+        creator &&
+        creator.followers &&
+        creator.followers.length > 0
+      ) {
+        creator.followers.forEach(
+          (followerId) => {
+            sendPushNotification(
+              followerId,
+              {
+                title: "New Post",
+                body: `${creator.username} posted something new.`,
+                url: `/posts/${newPost._id}`,
+              }
+            );
+          }
+        );
       }
     }
 
-    const populatedPost = await Post.findById(newPost._id).populate(
-      "author",
-      "username profilePicture",
+    // ==========================================
+    // RETURN POPULATED POST
+    // ==========================================
+
+    const populatedPost =
+      await Post.findById(
+        newPost._id
+      ).populate(
+        "author",
+        "username profilePicture"
+      );
+
+    res.status(201).json(
+      populatedPost
     );
 
-    res.status(201).json(populatedPost);
   } catch (error) {
-    console.error("Error creating post:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to create post", error: error.message });
+    console.error(
+      "Error creating post:",
+      error
+    );
+
+    res.status(500).json({
+      message:
+        "Failed to create post",
+      error: error.message,
+    });
   }
 };
 
@@ -344,88 +479,327 @@ const deletePost = async (req, res) => {
 
 const toggleLike = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id);
+    const postId = req.params.id;
+    const userId = req.user.id.toString();
+
+    const post = await Post.findById(postId);
 
     if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+      return res.status(404).json({
+        message: "Post not found",
+      });
     }
 
-    const isLiked = post.likes.includes(req.user.id);
+    // Safely compare ObjectIds as strings
+    const isLiked = (post.likes || []).some(
+      (id) => id.toString() === userId
+    );
+
+    // ==========================================================
+    // UNLIKE
+    // ==========================================================
 
     if (isLiked) {
-      post.likes = post.likes.filter(
-        (userId) => userId.toString() !== req.user.id,
-      );
+      const updatedPost =
+        await Post.findOneAndUpdate(
+          { _id: postId },
+          {
+            $pull: {
+              likes: req.user.id,
+            },
+          },
+          {
+            new: true,
+          }
+        );
 
-      // 4. ACTIVITY TRIGGER: Remove the like activity from the feed if they unlike it
       await Activity.findOneAndDelete({
         actor: req.user.id,
         actionType: "LIKE",
-        post: req.params.id,
-      });
-    } else {
-      post.likes.push(req.user.id);
-
-      // 5. ACTIVITY TRIGGER: Log the like activity
-      await Activity.create({
-        actor: req.user.id,
-        actionType: "LIKE",
-        post: req.params.id,
+        post: postId,
       });
 
-      // --- ADD NOTIFICATION HERE ---
-      if (post.author.toString() !== req.user.id.toString()) {
-        const actingUser = await User.findById(req.user.id);
-        sendPushNotification(post.author, {
-          title: "New Like!",
-          body: `${actingUser.username} liked your moment.`,
-          url: `/posts/${post._id}`,
-        });
-      }
-      // -----------------------------
+      return res.status(200).json(
+        updatedPost.likes
+      );
     }
 
-    await post.save();
+    // ==========================================================
+    // LIKE
+    // ==========================================================
 
-    res.status(200).json(post.likes);
+    const updatedPost =
+      await Post.findOneAndUpdate(
+        { _id: postId },
+        {
+          $addToSet: {
+            likes: req.user.id,
+          },
+        },
+        {
+          new: true,
+        }
+      );
+
+    // Activity
+    await Activity.create({
+      actor: req.user.id,
+      actionType: "LIKE",
+      post: postId,
+    });
+
+    // ==========================================================
+    // PUSH NOTIFICATION
+    // Only notify the owner of the post.
+    // ==========================================================
+
+    if (
+      post.author.toString() !== userId
+    ) {
+      const actingUser =
+        await User.findById(userId).select(
+          "username"
+        );
+
+      if (actingUser) {
+        sendPushNotification(
+          post.author,
+          {
+            title: "New Like!",
+            body: `${actingUser.username} liked your moment.`,
+            url: `/posts/${postId}`,
+          }
+        );
+      }
+    }
+
+    return res.status(200).json(
+      updatedPost.likes
+    );
+
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to toggle like", error: error.message });
+    console.error(
+      "Error toggling like:",
+      error
+    );
+
+    return res.status(500).json({
+      message: "Failed to toggle like",
+      error: error.message,
+    });
   }
 };
 
 const updatePost = async (req, res) => {
   try {
-    const { caption, category, authorRating, visibility } = req.body;
-    const post = await Post.findById(req.params.id);
+    const {
+      title,
+      caption,
+      category,
+      tags,
+      relatedLink,
+      linkType,
+      authorRating,
+      visibility,
+    } = req.body;
+
+    const post =
+      await Post.findById(
+        req.params.id
+      );
 
     if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+      return res.status(404).json({
+        message: "Post not found",
+      });
     }
 
-    if (post.author.toString() !== req.user.id) {
-      return res
-        .status(401)
-        .json({ message: "Not authorized to edit this post" });
+    // ==========================================
+    // AUTHORIZATION
+    // ==========================================
+
+    if (
+      post.author.toString() !==
+      req.user.id.toString()
+    ) {
+      return res.status(401).json({
+        message:
+          "Not authorized to edit this post",
+      });
     }
 
-    post.caption = caption || post.caption;
-    post.category = category || post.category;
+    // ==========================================
+    // TITLE
+    // ==========================================
+
+    if (
+      title !== undefined
+    ) {
+      if (!title.trim()) {
+        return res.status(400).json({
+          message:
+            "Title cannot be empty",
+        });
+      }
+
+      post.title =
+        title.trim();
+    }
+
+    // ==========================================
+    // CAPTION
+    // ==========================================
+
+    if (
+      caption !== undefined
+    ) {
+      post.caption =
+        caption.trim();
+    }
+
+    // ==========================================
+    // CATEGORY
+    // ==========================================
+
+    if (
+      category !== undefined
+    ) {
+      if (!category.trim()) {
+        return res.status(400).json({
+          message:
+            "Category cannot be empty",
+        });
+      }
+
+      post.category =
+        category.trim();
+    }
+
+    // ==========================================
+    // TAGS
+    // ==========================================
+
+    if (
+      tags !== undefined
+    ) {
+      post.tags =
+        parseTags(tags);
+    }
+
+    // ==========================================
+    // RELATED ITEM
+    // ==========================================
+
+    if (
+      relatedLink !== undefined ||
+      linkType !== undefined
+    ) {
+      // Remove related item
+      if (
+        !relatedLink ||
+        !relatedLink.trim()
+      ) {
+        post.relatedItem =
+          undefined;
+      } else {
+        if (!linkType) {
+          return res.status(400).json({
+            message:
+              "Related link type is required",
+          });
+        }
+
+        try {
+          new URL(
+            relatedLink.trim()
+          );
+        } catch {
+          return res.status(400).json({
+            message:
+              "Invalid related link URL",
+          });
+        }
+
+        post.relatedItem = {
+          type: linkType,
+          url: relatedLink.trim(),
+        };
+      }
+    }
+
+    // ==========================================
+    // VISIBILITY
+    // ==========================================
+
     if (visibility) {
-      post.visibility = visibility;
+      if (
+        ![
+          "PUBLIC",
+          "FOLLOWERS",
+          "PRIVATE",
+        ].includes(visibility)
+      ) {
+        return res.status(400).json({
+          message:
+            "Invalid visibility option",
+        });
+      }
+
+      post.visibility =
+        visibility;
     }
-    if (authorRating) post.authorRating = Number(authorRating);
 
-    const updatedPost = await post.save();
+    // ==========================================
+    // RATING
+    // ==========================================
 
-    await updatedPost.populate("author", "username profilePicture");
+    if (
+      authorRating !== undefined
+    ) {
+      const numericRating =
+        Number(authorRating);
 
-    res.status(200).json(updatedPost);
+      if (
+        numericRating < 0.5 ||
+        numericRating > 5
+      ) {
+        return res.status(400).json({
+          message:
+            "Rating must be between 0.5 and 5",
+        });
+      }
+
+      post.authorRating =
+        numericRating;
+    }
+
+    // ==========================================
+    // SAVE
+    // ==========================================
+
+    const updatedPost =
+      await post.save();
+
+    await updatedPost.populate(
+      "author",
+      "username profilePicture"
+    );
+
+    res.status(200).json(
+      updatedPost
+    );
+
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to update post", error: error.message });
+    console.error(
+      "Error updating post:",
+      error
+    );
+
+    res.status(500).json({
+      message:
+        "Failed to update post",
+      error: error.message,
+    });
   }
 };
 
@@ -480,5 +854,4 @@ module.exports = {
   updatePost,
   getPersonalFeed,
   getCategories,
-  getFeedPosts,
 };
