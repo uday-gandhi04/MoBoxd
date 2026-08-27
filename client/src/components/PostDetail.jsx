@@ -506,17 +506,6 @@ const PostDetail = () => {
                 </span>
               </div>
             </div>
-
-            {/* Review Count */}
-            <div className="flex flex-col sm:ml-auto">
-              <span className="text-xs text-moboxd-muted uppercase tracking-wider font-bold mb-1">
-                Ratings
-              </span>
-
-              <span className="font-bold text-white text-lg">
-                {post?.totalReviews || post?.reviews?.length || 0}
-              </span>
-            </div>
           </div>
         </div>
 
