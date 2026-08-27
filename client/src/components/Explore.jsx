@@ -357,16 +357,13 @@ const Explore = () => {
         // FOR YOU
         // ----------------------------------------------------
 
-        if (
-          activeTab ===
-            "FOR_YOU" &&
-          !hasQuery
-        ) {
-          setSelectedCategory(
-            "All"
-          );
-
-          await loadGlobalMoments();
+        if (activeTab === "FOR_YOU") {
+          if (!hasQuery) {
+            setSelectedCategory("All");
+            await loadGlobalMoments();
+          } else {
+            await searchMoments();
+          }
 
           return;
         }
@@ -850,7 +847,9 @@ const Explore = () => {
           <div className="flex items-center justify-between mb-5">
 
             <h2 className="text-xl font-extrabold text-white">
-              Global Moments
+              {hasQuery
+                ? `Moments for "${trimmedQuery}"`
+                : "Global Moments"}
             </h2>
 
           </div>
