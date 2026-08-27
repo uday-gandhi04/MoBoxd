@@ -210,7 +210,7 @@ const Profile = () => {
       : savedPosts;
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-4">
+    <div className="max-w-4xl mx-auto py-10 px-4 overflow-x-hidden">
       {/* Profile Header */}
       <div className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-12 pb-8 border-b border-[#2A2A35]">
         {/* Avatar */}
@@ -276,25 +276,25 @@ const Profile = () => {
           </div>
 
           {/* Stats Bar */}
-          <div className="flex items-center justify-center md:justify-start gap-8 md:gap-12 text-center mt-6">
+          <div className="grid grid-cols-4 items-center text-center mt-6 gap-1 md:gap-8 lg:gap-12 w-full">
             {/* Moments */}
-            <div className="flex flex-col">
+            <div className="min-w-0 flex-1 flex flex-col items-center">
               <span className="text-2xl font-bold text-white">
                 {userPosts.length}
               </span>
 
-              <span className="text-xs text-moboxd-muted uppercase tracking-widest">
+              <span className="text-[10px] sm:text-xs text-moboxd-muted uppercase tracking-[0.08em] sm:tracking-widest leading-tight break-words">
                 Moments
               </span>
             </div>
 
             {/* Rankings */}
-            <div className="flex flex-col">
+            <div className="min-w-0 flex-1 flex flex-col items-center">
               <span className="text-2xl font-bold text-white">
                 {userRankings.length}
               </span>
 
-              <span className="text-xs text-moboxd-muted uppercase tracking-widest">
+              <span className="text-[10px] sm:text-xs text-moboxd-muted uppercase tracking-[0.08em] sm:tracking-widest leading-tight break-words">
                 Rankings
               </span>
             </div>
@@ -305,13 +305,13 @@ const Profile = () => {
               onClick={() =>
                 openUserList("followers")
               }
-              className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity"
+              className="min-w-0 flex-1 flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity"
             >
               <span className="text-2xl font-bold text-white">
                 {followerCount}
               </span>
 
-              <span className="text-xs text-moboxd-muted uppercase tracking-widest">
+              <span className="text-[10px] sm:text-xs text-moboxd-muted uppercase tracking-[0.08em] sm:tracking-widest leading-tight break-words">
                 Followers
               </span>
             </button>
@@ -322,13 +322,13 @@ const Profile = () => {
               onClick={() =>
                 openUserList("following")
               }
-              className="flex flex-col cursor-pointer hover:opacity-80 transition-opacity"
+              className="min-w-0 flex-1 flex flex-col items-center cursor-pointer hover:opacity-80 transition-opacity"
             >
               <span className="text-2xl font-bold text-white">
                 {followingCount}
               </span>
 
-              <span className="text-xs text-moboxd-muted uppercase tracking-widest">
+              <span className="text-[10px] sm:text-xs text-moboxd-muted uppercase tracking-[0.08em] sm:tracking-widest leading-tight break-words">
                 Following
               </span>
             </button>
