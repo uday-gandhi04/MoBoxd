@@ -181,18 +181,9 @@ const PostDetail = () => {
         },
       );
 
-      setPost((prev) => {
-        const updatedReviews = prev.reviews.filter(
-          (review) => review._id !== reviewId,
-        );
+      const updatedPost = response.data.post || response.data;
 
-        return {
-          ...prev,
-          reviews: updatedReviews,
-          communityAverageRating: response.data.communityAverageRating,
-          totalReviews: response.data.totalReviews,
-        };
-      });
+      setPost(updatedPost);
     } catch (err) {
       console.error("Error deleting review:", err);
       alert(err.response?.data?.message || "Failed to delete review");

@@ -6,6 +6,7 @@ const {
   createPost,
   getPostById,
   addReview,
+  updateReview,
   deleteReview,
   deletePost,
   toggleLike,
@@ -42,6 +43,7 @@ router.route("/:id/like")
 router.route("/:id/reviews")
   .post(protect, addReview);
 
+router.put("/:id/reviews/:reviewId", protect, updateReview);
 router.delete("/:id/reviews/:reviewId", protect, deleteReview);
 
 
