@@ -11,42 +11,55 @@ const PostCard = ({
   onBookmark,
   onShare,
 }) => {
-  const title = post.title?.trim();
+  const title = post?.title?.trim() || "";
+  const caption = post?.caption?.trim() || "";
+
+  const authorUsername =
+    post?.author?.username || "Unknown User";
+
+  const authorProfilePicture =
+    post?.author?.profilePicture || null;
+
+  const category =
+    post?.category || "Other";
+
+  const authorRating =
+    Number(post?.authorRating || 0);
 
   return (
-    <div className="bg-moboxd-card rounded-2xl overflow-hidden mb-8 border border-[#2A2A35] shadow-lg">
+    <article className="bg-moboxd-card rounded-2xl overflow-hidden mb-8 border border-[#2A2A35] shadow-lg">
       {/* =====================================================
           HEADER
       ===================================================== */}
 
       <div className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Link
-            to={`/profile/${post.author.username}`}
-            className="w-10 h-10 rounded-full bg-[#2A2A35] flex items-center justify-center overflow-hidden"
+            to={`/profile/${authorUsername}`}
+            className="w-10 h-10 rounded-full bg-[#2A2A35] flex items-center justify-center overflow-hidden shrink-0"
           >
-            {post.author?.profilePicture ? (
+            {authorProfilePicture ? (
               <img
-                src={post.author.profilePicture}
-                alt={post.author.username}
+                src={authorProfilePicture}
+                alt={authorUsername}
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
             ) : (
-              <i className="bi bi-person-fill text-moboxd-muted"></i>
+              <i className="bi bi-person-fill text-moboxd-muted" />
             )}
           </Link>
 
           <Link
-            to={`/profile/${post.author.username}`}
-            className="font-bold text-white hover:text-moboxd-accent transition-colors"
+            to={`/profile/${authorUsername}`}
+            className="font-bold text-white hover:text-moboxd-accent transition-colors truncate"
           >
-            {post.author.username}
+            {authorUsername}
           </Link>
         </div>
 
-        <span className="text-xs font-bold px-3 py-1 bg-[#2A2A35] rounded-full text-moboxd-muted uppercase tracking-wider">
-          {post.category}
+        <span className="text-xs font-bold px-3 py-1 bg-[#2A2A35] rounded-full text-moboxd-muted uppercase tracking-wider shrink-0 ml-3">
+          {category}
         </span>
       </div>
 
@@ -60,7 +73,12 @@ const PostCard = ({
       >
         <img
           src={post.imageUrl}
-          alt={title || post.category || "MoBoxd moment"}
+          alt={
+            title ||
+            caption ||
+            category ||
+            "MoBoxd moment"
+          }
           className="w-full aspect-[4/5] object-cover"
           loading="lazy"
         />
@@ -70,114 +88,49 @@ const PostCard = ({
           CONTENT
       ===================================================== */}
 
-      <div className="p-4">
-        {/* New posts have titles.
-            Old posts can legitimately have no title. */}
+      <div className="px-4 pt-4 pb-3">
+        {/* Title */}
 
         {title && (
           <Link
             to={`/posts/${post._id}`}
-            className="block text-white text-xl font-bold mb-2 hover:text-moboxd-accent transition-colors"
+            className="block text-white text-xl font-bold leading-tight truncate hover:text-moboxd-accent transition-colors mb-1"
+            title={title}
           >
             {title}
           </Link>
         )}
 
-        {post.caption && (
-          <p className="text-white mb-4 text-lg whitespace-pre-wrap">
-            {post.caption}
+        {/* Caption */}
+        {caption && (
+          <p
+            className={`text-moboxd-muted text-[15px] leading-6 truncate ${
+              title ? "" : "text-white"
+            }`}
+            title={caption}
+          >
+            {caption}
           </p>
         )}
 
-        {/* =================================================
-            TAGS
-        ================================================= */}
-
-        {Array.isArray(post.tags) &&
-          post.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {post.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="text-xs text-moboxd-accent bg-moboxd-accent/10 border border-moboxd-accent/20 rounded-full px-2.5 py-1"
-                >
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          )}
-
-        {/* =================================================
-            RELATED ITEM
-        ================================================= */}
-
-        {post.relatedItem?.url && (
-          <a
-            href={post.relatedItem.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-[#1A1A21] border border-[#2A2A35] text-sm text-white hover:border-moboxd-accent hover:text-moboxd-accent transition-colors"
-          >
-            <i
-              className={
-                post.relatedItem.type === "PLACE"
-                  ? "bi bi-geo-alt"
-                  : post.relatedItem.type === "MUSIC"
-                    ? "bi bi-music-note-beamed"
-                    : post.relatedItem.type === "MOVIE_TV"
-                      ? "bi bi-film"
-                      : post.relatedItem.type === "BOOK"
-                        ? "bi bi-book"
-                        : post.relatedItem.type === "GAME"
-                          ? "bi bi-controller"
-                          : post.relatedItem.type === "PRODUCT"
-                            ? "bi bi-bag"
-                            : "bi bi-link-45deg"
-              }
-            />
-
-            <span>
-              {post.relatedItem.type === "PLACE"
-                ? "Related Place"
-                : post.relatedItem.type === "MUSIC"
-                  ? "Related Music"
-                  : post.relatedItem.type === "MOVIE_TV"
-                    ? "Related Movie / TV"
-                    : post.relatedItem.type === "BOOK"
-                      ? "Related Book"
-                      : post.relatedItem.type === "GAME"
-                        ? "Related Game"
-                        : post.relatedItem.type === "PRODUCT"
-                          ? "Related Product"
-                          : post.relatedItem.type === "ARTICLE"
-                            ? "Related Article"
-                            : "Related Link"}
-            </span>
-
-            <i className="bi bi-box-arrow-up-right text-xs"></i>
-          </a>
-        )}
-
-        {/* =================================================
+        {/* ===================================================
             AUTHOR RATING
-        ================================================= */}
+        =================================================== */}
 
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs text-moboxd-muted uppercase tracking-wider font-bold me-2">
+        <div className="flex items-center gap-2 mt-4">
+          <span className="text-[11px] text-moboxd-muted uppercase tracking-wider font-bold mr-1">
             Author Rating
           </span>
 
-          <div className="flex text-moboxd-accent text-sm">
+          <div className="flex items-center text-moboxd-accent text-sm">
             {[1, 2, 3, 4, 5].map((star) => {
-              const rating = Number(
-                post.authorRating || 0,
-              );
-
               let iconClass = "bi-star";
 
-              if (rating >= star) {
+              if (authorRating >= star) {
                 iconClass = "bi-star-fill";
-              } else if (rating >= star - 0.5) {
+              } else if (
+                authorRating >= star - 0.5
+              ) {
                 iconClass = "bi-star-half";
               }
 
@@ -190,8 +143,8 @@ const PostCard = ({
             })}
           </div>
 
-          <span className="font-bold text-white ms-1">
-            {Number(post.authorRating || 0).toFixed(1)}
+          <span className="font-bold text-white text-sm">
+            {authorRating.toFixed(1)}
           </span>
         </div>
       </div>
@@ -204,10 +157,19 @@ const PostCard = ({
         {/* LEFT */}
 
         <div className="flex items-center gap-6">
+          {/* Like */}
+
           <button
             disabled={likeLoading}
-            onClick={(e) => onLike(e, post._id)}
+            onClick={(e) =>
+              onLike(e, post._id)
+            }
             className="flex items-center gap-2 group transition-colors focus:outline-none disabled:opacity-50"
+            title={
+              isLiked
+                ? "Unlike"
+                : "Like"
+            }
           >
             {likeLoading ? (
               <div className="w-4 h-4 border-2 border-moboxd-muted border-t-transparent rounded-full animate-spin" />
@@ -232,9 +194,12 @@ const PostCard = ({
             </span>
           </button>
 
+          {/* Comments */}
+
           <Link
             to={`/posts/${post._id}`}
             className="flex items-center gap-2 group transition-colors"
+            title="Comments"
           >
             <i className="bi bi-chat text-moboxd-muted group-hover:text-white" />
 
@@ -247,12 +212,14 @@ const PostCard = ({
         {/* RIGHT */}
 
         <div className="flex items-center gap-5">
+          {/* Share */}
+
           <button
             onClick={(e) =>
               onShare(
                 e,
                 post._id,
-                post.author.username,
+                authorUsername,
               )
             }
             className="group transition-colors focus:outline-none flex items-center"
@@ -261,13 +228,22 @@ const PostCard = ({
             <i className="text-lg bi bi-share text-moboxd-muted group-hover:text-white" />
           </button>
 
+          {/* Bookmark */}
+
           <button
             disabled={bookmarkLoading}
             onClick={(e) =>
-              onBookmark(e, post._id)
+              onBookmark(
+                e,
+                post._id,
+              )
             }
             className="group transition-colors focus:outline-none flex items-center disabled:opacity-50"
-            title={isBookmarked ? "Unsave" : "Save"}
+            title={
+              isBookmarked
+                ? "Remove bookmark"
+                : "Bookmark"
+            }
           >
             {bookmarkLoading ? (
               <div className="w-4 h-4 border-2 border-moboxd-muted border-t-transparent rounded-full animate-spin" />
@@ -283,7 +259,7 @@ const PostCard = ({
           </button>
         </div>
       </div>
-    </div>
+    </article>
   );
 };
 
